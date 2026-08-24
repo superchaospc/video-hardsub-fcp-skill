@@ -1,0 +1,11 @@
+{
+  "skills": ["video-hardsub-fcp"],
+  "query": "去字幕切段：处理这个带固定底部硬字幕的竖屏 MP4，交付可在 Final Cut Pro 继续编辑的时间线。",
+  "expected_behavior": [
+    "Inspects metadata and contact sheets before choosing a subtitle region",
+    "Preserves the source and uses a separate ASCII working copy",
+    "Submits the HitPaw job once and recovers the existing result instead of resubmitting",
+    "Generates high-recall cut candidates and visually reviews adjacent frame pairs",
+    "Verifies decode, audio, duration, geometry, and FCPXML continuity"
+  ]
+}

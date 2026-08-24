@@ -1,0 +1,11 @@
+{
+  "skills": ["video-hardsub-fcp"],
+  "query": "批量去字幕切段：这个文件夹里有 12 个视频，字幕位置可能不同，其中一个字幕会移动。",
+  "expected_behavior": [
+    "Inventories every file and groups only files with visually compatible subtitle regions",
+    "Requests one explicit batch confirmation covering files, regions, full-frame risks, and credit usage",
+    "Does not apply one crop or inpaint region blindly to all files",
+    "Maintains resumable per-file state and never publishes source videos or service URLs",
+    "Produces one cleaned media file and one editable FCPXML package per source"
+  ]
+}

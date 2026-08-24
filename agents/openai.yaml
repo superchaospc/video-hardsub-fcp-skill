@@ -1,0 +1,6 @@
+interface:
+  display_name: "Video Hardsub → FCP"
+  short_description: "批量去硬字幕、精细识别跳剪并生成可编辑 FCPXML"
+  default_prompt: "Use $video-hardsub-fcp to remove burned-in subtitles, review fine jump cuts, keep any approved trim synchronized with source audio, and prepare an editable Final Cut Pro timeline."
+policy:
+  allow_implicit_invocation: true

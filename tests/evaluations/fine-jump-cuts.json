@@ -1,0 +1,11 @@
+{
+  "skills": ["video-hardsub-fcp"],
+  "query": "去字幕切段，但上一版漏了很多同机位微跳剪。画面里还有蒸汽、撒料和快速翻炒，不要把持续运动都当成剪辑点。",
+  "expected_behavior": [
+    "Combines scene scores, keyframes, and isolated frame-difference peaks instead of relying on scene score alone",
+    "Uses a fine high-recall mode and clusters nearby evidence into one candidate",
+    "Produces before/after review sheets for every candidate",
+    "Rejects persistent motion, steam, ingredient motion, and camera shake unless a true discontinuity is visible",
+    "Builds the timeline only from visually approved cut frames"
+  ]
+}

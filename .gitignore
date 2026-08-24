@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# macOS
+.DS_Store
+._*
+
+# Local work roots and generated deliverables
+work/
+jobs/
+deliverables/
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.zip
+
+# Review frames and contact sheets
+cut-review/
+review/
+*.jpg
+*.jpeg
+*.png
+
+# Service/result logs, credentials, and local manifests
+*.log
+*.key
+*.pem
+batch-manifest.json
+batch-manifest-*.json
+*-batch-manifest.json

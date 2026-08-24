@@ -1,0 +1,33 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Run synthetic integration test
+        run: bash tests/integration/synthetic-cuts.sh
+
+      - name: Check shell syntax
+        run: bash -n scripts/*.sh tests/integration/*.sh
+
+      - name: Validate Skill repository
+        run: python3 scripts/validate-skill.py .
