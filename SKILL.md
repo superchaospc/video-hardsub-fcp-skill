@@ -91,7 +91,9 @@ Generate high-recall candidates in fine mode. The analyzer combines scene scores
 python3 "$SKILL_DIR/scripts/analyze-cuts.py" "$CLEANED_MEDIA" --mode fine --output "$JOB_DIR/cut-plan.json" --review-dir "$JOB_DIR/cut-review"
 ```
 
-Review the before/after frame pair for every candidate. Put every candidate exactly once in `selected_frames` or `rejected_candidates`. Approve only a visible temporal discontinuity. Reject continuous steam, ingredient motion, fast action, camera shake, or other persistent motion unless the adjacent frames show a true discontinuity. Allowed rejection reasons are `persistent-motion`, `steam`, `ingredient-motion`, `camera-shake`, and `no-visible-discontinuity`.
+Review every candidate. Each sheet row holds one candidate as four consecutive frames (offsets -2, -1, 0, +1), so continuous motion carries across the row while a real cut breaks it; judge from the whole row, not from one adjacent pair. Rows are clamped and repeat an end frame when a candidate sits near the media boundary. Put every candidate exactly once in `selected_frames` or `rejected_candidates`. Approve only a visible temporal discontinuity. Reject continuous steam, ingredient motion, fast action, camera shake, or other persistent motion unless the row shows a true discontinuity. Allowed rejection reasons are `persistent-motion`, `steam`, `ingredient-motion`, `camera-shake`, and `no-visible-discontinuity`.
+
+A candidate anchors a cluster of nearby evidence, so its frame can sit one frame after the visible cut when the cluster carries no keyframe evidence. Judge the cluster, and keep the candidate's own frame number: `build-fcpxml.py` requires `selected_frames` to be drawn from the candidate list.
 
 ## FCPXML and delivery
 

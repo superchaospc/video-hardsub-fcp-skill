@@ -317,18 +317,88 @@ lavfi.scene_score=0.2
         self.assertIn("-copyts", scene)
         self.assertIn("-copyts", ydif)
 
-    def test_review_index_maps_ten_candidates_per_page(self):
+    def test_review_index_pages_landscape_five_candidates_per_page(self):
         candidates = [
             MODULE.Candidate(frame, frame / 30, 1.0, ["ydif"])
-            for frame in range(10, 21)
+            for frame in range(10, 16)
         ]
-        index = MODULE.make_review_index(candidates)
+        index = MODULE.make_review_index(candidates, 1920, 1080, 300)
         self.assertEqual([page["page"] for page in index["pages"]], [1, 2])
-        self.assertEqual(index["pages"][0]["tiles"][9]["frame"], 19)
+        self.assertEqual(len(index["pages"][0]["tiles"]), 5)
         self.assertEqual(
             index["pages"][1]["tiles"],
-            [{"tile": 1, "frame": 20, "before_frame": 19}],
+            [
+                {
+                    "tile": 1,
+                    "frame": 15,
+                    "before_frame": 14,
+                    "context_frames": [13, 14, 15, 16],
+                }
+            ],
         )
+
+    def test_review_index_pages_portrait_three_candidates_per_page(self):
+        candidates = [
+            MODULE.Candidate(frame, frame / 30, 1.0, ["ydif"])
+            for frame in range(10, 14)
+        ]
+        index = MODULE.make_review_index(candidates, 720, 1280, 300)
+        self.assertEqual([page["page"] for page in index["pages"]], [1, 2])
+        self.assertEqual(len(index["pages"][0]["tiles"]), 3)
+        self.assertEqual(len(index["pages"][1]["tiles"]), 1)
+
+    def test_context_frames_clamp_at_media_boundaries(self):
+        # A candidate at frame 1 has no frame -1; the window repeats frame 0
+        # rather than shrinking, so every tile keeps a fixed column count.
+        self.assertEqual(MODULE.context_frames_for(1, 300), [0, 0, 1, 2])
+        self.assertEqual(MODULE.context_frames_for(299, 300), [297, 298, 299, 299])
+        self.assertEqual(MODULE.context_frames_for(50, 300), [48, 49, 50, 51])
+
+    def test_review_pipeline_writes_frames_in_requested_order(self):
+        # Overlapping context windows repeat frames and step backwards relative to
+        # decode order. The tiler must still receive them in requested order.
+        requested = [8, 9, 10, 11, 10, 11, 12, 13]
+        frame_size = 4
+        payloads = {n: bytes([n]) * frame_size for n in range(16)}
+
+        class FakeStdout:
+            def __init__(self):
+                self.frame = 0
+
+            def read(self, size):
+                if self.frame >= 16:
+                    return b""
+                data = payloads[self.frame][:size]
+                self.frame += 1
+                return data
+
+            def close(self):
+                pass
+
+        written = []
+
+        class FakeStdin:
+            def write(self, data):
+                written.append(data[0])
+
+            def close(self):
+                pass
+
+        decoder = mock.Mock(stdout=FakeStdout(), wait=mock.Mock(return_value=0))
+        tiler = mock.Mock(stdin=FakeStdin(), wait=mock.Mock(return_value=0))
+        with mock.patch.object(
+            MODULE.subprocess, "Popen", side_effect=[tiler, decoder]
+        ):
+            MODULE._run_review_pipeline(
+                [["decoder"], ["tiler"]], requested, frame_size
+            )
+        self.assertEqual(written, requested)
+
+    def test_context_frames_are_non_decreasing(self):
+        for frame in (0, 1, 2, 150, 298, 299):
+            window = MODULE.context_frames_for(frame, 300)
+            self.assertEqual(window, sorted(window))
+            self.assertEqual(len(window), MODULE.CONTEXT_COLUMNS)
 
     def test_review_decoding_uses_bounded_pipeline_as_candidates_grow(self):
         candidates = [
@@ -501,7 +571,14 @@ lavfi.scene_score=0.2
             review = root / "review"
             review.mkdir()
             (review / "old.txt").write_text("old-review", encoding="utf-8")
-            probe = mock.Mock(fps=30.0, frame_count=30, duration=1.0, start_time=0.0)
+            probe = mock.Mock(
+                fps=30.0,
+                frame_count=30,
+                duration=1.0,
+                start_time=0.0,
+                width=160,
+                height=90,
+            )
             completed = subprocess.CompletedProcess([], 0, stdout="", stderr="")
             shared = [
                 mock.patch.object(MODULE.shutil, "which", return_value="/usr/bin/tool"),

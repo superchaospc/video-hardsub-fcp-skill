@@ -681,17 +681,44 @@ def _atomic_json(path: Path, payload: dict) -> None:
         raise
 
 
-def make_review_index(candidates: Sequence[Candidate]) -> dict:
+CONTEXT_OFFSETS = (-2, -1, 0, 1)
+CONTEXT_COLUMNS = len(CONTEXT_OFFSETS)
+
+
+def candidates_per_page(width: int, height: int) -> int:
+    """Rows per sheet, chosen so a page stays legible for the source aspect.
+
+    Each candidate occupies one row of CONTEXT_COLUMNS frames. Portrait sources
+    produce tall rows, so fewer fit before a page becomes too large to read.
+    """
+    if width <= 0 or height <= 0:
+        raise AnalysisError("Cannot lay out review sheets without valid dimensions")
+    return 3 if height > width else 5
+
+
+def context_frames_for(candidate_frame: int, frame_count: int) -> list[int]:
+    """Frames rendered for one candidate, clamped to the media and non-decreasing."""
+    if frame_count <= 0:
+        raise AnalysisError("Cannot select context frames without a frame count")
+    last = frame_count - 1
+    return [min(max(candidate_frame + offset, 0), last) for offset in CONTEXT_OFFSETS]
+
+
+def make_review_index(
+    candidates: Sequence[Candidate], width: int, height: int, frame_count: int
+) -> dict:
     """Build the deterministic page/tile mapping used beside review sheets."""
+    per_page = candidates_per_page(width, height)
     pages: list[dict] = []
-    for offset in range(0, len(candidates), 10):
-        page_number = offset // 10 + 1
-        page_candidates = candidates[offset : offset + 10]
+    for offset in range(0, len(candidates), per_page):
+        page_number = offset // per_page + 1
+        page_candidates = candidates[offset : offset + per_page]
         tiles = [
             {
                 "tile": tile_number,
                 "frame": candidate.frame,
                 "before_frame": candidate.frame - 1,
+                "context_frames": context_frames_for(candidate.frame, frame_count),
             }
             for tile_number, candidate in enumerate(page_candidates, start=1)
         ]
@@ -718,7 +745,9 @@ def build_review_commands(
     scaled_height = max(2, round(height * scaled_width / width))
     if scaled_height % 2:
         scaled_height += 1
-    page_count = math.ceil(len(candidates) / 10)
+    rows = candidates_per_page(width, height)
+    tiles_per_page = CONTEXT_COLUMNS * rows
+    page_count = math.ceil(len(candidates) / rows)
     decoder = [
         "ffmpeg",
         "-hide_banner",
@@ -755,7 +784,8 @@ def build_review_commands(
         "-i",
         "-",
         "-vf",
-        "tile=4x5:nb_frames=20:padding=2:margin=2:color=black",
+        f"tile={CONTEXT_COLUMNS}x{rows}:nb_frames={tiles_per_page}"
+        ":padding=2:margin=2:color=black",
         "-frames:v",
         str(page_count),
         "-y",
@@ -804,15 +834,34 @@ def _run_review_pipeline(
             raise AnalysisError(f"Review pipeline could not start: {exc}") from exc
         assert decoder.stdout is not None
         assert tiler.stdin is not None
-        needed = Counter(requested_frames)
+        # Frames must reach the tiler in requested order, which is not the same as
+        # decode order: context windows repeat frames and may step backwards when
+        # two candidates sit close together. Cache only frames still owed to the
+        # tiler and release each one as soon as its last write completes.
+        pending = list(requested_frames)
+        remaining = Counter(pending)
+        cache: dict[int, bytes] = {}
+        write_index = 0
         frame_number = 0
         while True:
             frame = _read_raw_frame(decoder.stdout, frame_size)
             if frame is None:
                 break
-            for _ in range(needed.pop(frame_number, 0)):
-                tiler.stdin.write(frame)
+            if remaining.get(frame_number):
+                cache[frame_number] = frame
+            while write_index < len(pending):
+                wanted = pending[write_index]
+                buffered = cache.get(wanted)
+                if buffered is None:
+                    break
+                tiler.stdin.write(buffered)
+                write_index += 1
+                remaining[wanted] -= 1
+                if remaining[wanted] <= 0:
+                    del remaining[wanted]
+                    del cache[wanted]
             frame_number += 1
+        needed = Counter(pending[write_index:])
         decoder.stdout.close()
         decoder_code = decoder.wait()
         tiler.stdin.close()
@@ -847,9 +896,14 @@ def render_review(
     width: int = 320,
     height: int = 180,
     fps: float = 30.0,
+    frame_count: int | None = None,
 ) -> dict:
     review_dir.mkdir(parents=True, exist_ok=False)
-    index = make_review_index(candidates)
+    if frame_count is None:
+        frame_count = max(
+            (candidate.frame for candidate in candidates), default=0
+        ) + 1 + max(CONTEXT_OFFSETS)
+    index = make_review_index(candidates, width, height, frame_count)
     commands = build_review_commands(
         source, candidates, review_dir, width=width, height=height, fps=fps
     )
@@ -860,7 +914,7 @@ def render_review(
         requested = [
             frame
             for candidate in candidates
-            for frame in (candidate.frame - 1, candidate.frame)
+            for frame in context_frames_for(candidate.frame, frame_count)
         ]
         _run_review_pipeline(commands, requested, 320 * scaled_height * 3)
     _atomic_json(review_dir / "index.json", index)
@@ -935,7 +989,9 @@ def _report_retained(path: Path, purpose: str) -> None:
     print(f"warning: retained {purpose} artifact for safe cleanup: {path}", file=sys.stderr)
 
 
-def _validate_staged_artifacts(plan_path: Path, review_dir: Path, plan: dict) -> None:
+def _validate_staged_artifacts(
+    plan_path: Path, review_dir: Path, plan: dict, width: int, height: int
+) -> None:
     try:
         with plan_path.open(encoding="utf-8") as handle:
             stored_plan = json.load(handle)
@@ -954,7 +1010,10 @@ def _validate_staged_artifacts(plan_path: Path, review_dir: Path, plan: dict) ->
                 item["evidence"],
             )
             for item in plan["candidates"]
-        ]
+        ],
+        width,
+        height,
+        plan["frame_count"],
     )
     if stored_index != expected_index:
         raise AnalysisError("Staged review index does not match candidate frames")
@@ -1340,9 +1399,12 @@ def _run_analysis(
                 width=info.width,
                 height=info.height,
                 fps=info.fps,
+                frame_count=info.frame_count,
             )
             _atomic_json(staged_plan, plan)
-            _validate_staged_artifacts(staged_plan, staged_review, plan)
+            _validate_staged_artifacts(
+                staged_plan, staged_review, plan, info.width, info.height
+            )
             if _source_signature(source) != original_source:
                 raise AnalysisError("Input video changed during analysis; artifacts were not published")
             _reject_unsafe_paths(source, output, review_dir)
