@@ -15,6 +15,7 @@ Copy this checklist into the working notes and keep it current:
 
 Video workflow:
 - [ ] Inventory sources; preserve originals
+- [ ] Record each source's `width`x`height`; carry it as the required output resolution
 - [ ] Inspect contact sheets; choose per-file subtitle regions
 - [ ] Confirm one batch manifest, regions, full-frame risk, and HitPaw credits
 - [ ] Submit each HitPaw job once; recover completed jobs from logs
@@ -23,6 +24,22 @@ Video workflow:
 - [ ] Classify every candidate: approve true discontinuities; reject persistent motion artifacts
 - [ ] Build and validate one FCPXML timeline per cleaned video
 - [ ] Deliver media, FCPXML, report, and a small manifest
+
+## Resolution is a deliverable
+
+The output resolution must equal the source resolution. Record `width`x`height` from the first `ffprobe` of each source and treat it as a required output property, not something to read off the finished file. Upstream subtitle removal silently downscales — an export preset that says "1080" turns a 720x1080 source into 608x1080 — and a downscale is unrecoverable once it has happened.
+
+Never satisfy this by upscaling a downscaled result back to source dimensions. That passes `source_display_geometry` while the detail is already gone. Fix it at the export, or report the loss.
+
+## Entry path: subtitles already removed
+
+If the user supplies media whose subtitles were removed elsewhere ("去字幕已经好了", "只要切段", a file from another tool), skip the HitPaw sections and start at Fine jump-cut decisions — but first:
+
+1. Ask for, or locate, the media **as it existed before subtitle removal**. Set it as `$SOURCE`. The file the user just handed you is `$CLEANED_MEDIA`, never `$SOURCE`.
+2. Run the verification below with that `$SOURCE`. `verify-video.sh` fails `source_identity` when `$SOURCE` and `$CLEANED_MEDIA` are byte-identical, because a file compared against itself proves nothing about geometry.
+3. If the pre-removal original genuinely cannot be produced, run verification without `--source` and state plainly in the report: resolution, frame rate, and duration could not be verified against the original, so any upstream change to them is unknown. Do not describe the delivery as matching the source.
+
+A resolution mismatch found here is reported, not repaired: tell the user the source and delivered dimensions, and that re-exporting from the subtitle-removal tool at source resolution is the only real fix.
 
 ## Safety and inventory
 
@@ -81,7 +98,7 @@ trimmed_cleaned_fps=$(ffprobe -v error -select_streams v:0 -show_entries stream=
 "$SKILL_DIR/scripts/verify-video.sh" "$TRIMMED_CLEANED_MEDIA" "$JOB_DIR/verify-trimmed" --source "$TRIMMED_SOURCE_REFERENCE"
 ```
 
-After trimming, use `$TRIMMED_CLEANED_MEDIA` as the cleaned deliverable. Never remux full-length source audio onto trimmed video, and never verify a trimmed output against the full source. `verify-video.sh` checks display geometry, duration tolerance, full decodability, 1 fps sheet generation, and whether audio is present when the comparison source has audio. It does not prove audio identity or matching FPS; the remux and explicit FPS comparisons above are required. Visually compare the raw HitPaw result with the source wherever food, hands, tools, packaging, or UI may have been damaged. A script pass does not replace this review.
+After trimming, use `$TRIMMED_CLEANED_MEDIA` as the cleaned deliverable. Never remux full-length source audio onto trimmed video, and never verify a trimmed output against the full source. `verify-video.sh` checks display geometry, duration tolerance, full decodability, 1 fps sheet generation, whether audio is present when the comparison source has audio, and `source_identity` — that `$SOURCE` is not byte-identical to `$CLEANED_MEDIA`, which would make every source comparison vacuous. It does not prove audio identity or matching FPS; the remux and explicit FPS comparisons above are required. Visually compare the raw HitPaw result with the source wherever food, hands, tools, packaging, or UI may have been damaged. A script pass does not replace this review.
 
 ## Fine jump-cut decisions
 

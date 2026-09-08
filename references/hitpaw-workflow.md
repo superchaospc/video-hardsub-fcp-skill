@@ -7,16 +7,17 @@ Read this sequence completely before submitting any HitPaw job. HitPaw is a paid
 1. Create a dedicated ASCII-only work root. Copy each MP4/MOV into its own folder; never edit or upload the source in place.
 2. Run `"$SKILL_DIR/scripts/inspect-video.sh" "$WORKING_COPY" "$JOB_DIR/inspect"` and inspect the metadata plus full-frame and subtitle-band contact sheets.
 3. Select a per-file region. Use a tight band for fixed captions. Use full frame for moving captions only after warning that generative repair can damage food, hands, tools, packaging, or UI.
-4. Confirm desktop-control capability. Without it, stop before submission and state that no job was submitted.
-5. Prepare one batch manifest and obtain one confirmation for the exact files, regions, full-frame risks, and total paid-credit use. Never silently purchase or consume credits.
-6. If HitPaw rejects the working media, create a compatibility MP4 inside the job folder while retaining the working copy:
+4. Set HitPaw's export resolution to the source's exact `width`x`height` before submitting, and record it as `export_resolution` in the manifest entry. HitPaw's presets are named by one dimension ("1080"), so a 720x1280 source silently exports as 608x1080 unless the resolution is set explicitly. Verify the setting in the export dialog rather than assuming the default preserves it — this is the only step that actually preserves resolution; every later check can only detect the loss.
+5. Confirm desktop-control capability. Without it, stop before submission and state that no job was submitted.
+6. Prepare one batch manifest and obtain one confirmation for the exact files, regions, full-frame risks, and total paid-credit use. Never silently purchase or consume credits.
+7. If HitPaw rejects the working media, create a compatibility MP4 inside the job folder while retaining the working copy:
 
    ```bash
    ffmpeg -nostdin -i "$WORKING_COPY" -map 0:v:0 -map '0:a?' -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart "$JOB_DIR/hitpaw-input.mp4"
    ```
 
-7. Process paid jobs sequentially per manifest entry: submit one approved file once, immediately record its `submission_status`, then wait for or recover that file's result before submitting the next entry. This prevents concurrent or out-of-order completions from being assigned to the wrong source. Do not submit the same entry again after a slow render, stalled download, timeout, restart, or ambiguous UI state.
-8. Wait for or recover the existing completion from HitPaw's local logs. Do not paste raw logs or signed URLs into the manifest. If jobs were already submitted concurrently, set `HITPAW_LOG_FILE` to the job-specific log for each recovery and stop for human resolution if the source-to-result mapping is not unambiguous:
+8. Process paid jobs sequentially per manifest entry: submit one approved file once, immediately record its `submission_status`, then wait for or recover that file's result before submitting the next entry. This prevents concurrent or out-of-order completions from being assigned to the wrong source. Do not submit the same entry again after a slow render, stalled download, timeout, restart, or ambiguous UI state.
+9. Wait for or recover the existing completion from HitPaw's local logs. Do not paste raw logs or signed URLs into the manifest. If jobs were already submitted concurrently, set `HITPAW_LOG_FILE` to the job-specific log for each recovery and stop for human resolution if the source-to-result mapping is not unambiguous:
 
    ```bash
    "$SKILL_DIR/scripts/fetch-hitpaw-result.sh" --wait "$JOB_DIR/hitpaw-raw.mp4"
@@ -24,9 +25,9 @@ Read this sequence completely before submitting any HitPaw job. HitPaw is a paid
    ```
 
    The first command watches for a newer result from an already-submitted job. The second fetches an existing completed result. A download failure is not permission to resubmit.
-9. Preserve `hitpaw-raw.mp4`. Restore source display geometry to `$RESTORED_VIDEO`, then remux the original source audio into the cleaned picture: `ffmpeg -nostdin -i "$RESTORED_VIDEO" -i "$SOURCE" -map 0:v:0 -map '1:a?' -c:v copy -c:a copy -map_metadata 1 "$CLEANED_MEDIA"`.
-10. Compare source and cleaned `avg_frame_rate` explicitly with `ffprobe`, then run `"$SKILL_DIR/scripts/verify-video.sh" "$CLEANED_MEDIA" "$JOB_DIR/verify" --source "$SOURCE"`. The helper checks display geometry, duration tolerance, full decodability, 1 fps sheet generation, and audio presence when the source has audio. It does not prove audio identity or FPS equality; the remux and separate FPS comparison are mandatory.
-11. Trim only an end card the user explicitly confirmed. Record one approved `TRIM_START`/`TRIM_END` interval and apply it identically to the restored picture and preserved source audio. Use `-shortest` and quoted optional maps when creating `$TRIMMED_CLEANED_MEDIA`, then create `$TRIMMED_SOURCE_REFERENCE` from the same source interval:
+10. Preserve `hitpaw-raw.mp4`. Compare its `width`x`height` against the source's before anything else. If they differ, step 4's export resolution did not take effect: re-export from HitPaw at the source resolution rather than continuing. Only when HitPaw cannot be made to preserve the dimensions may you rescale `hitpaw-raw.mp4` to `$RESTORED_VIDEO` — and then record the raw result's dimensions in the manifest and tell the user the delivery was upscaled from a smaller export and has lost detail. Rescaling makes `source_display_geometry` pass; it does not restore resolution, so never do it silently. Then remux the original source audio into the cleaned picture: `ffmpeg -nostdin -i "$RESTORED_VIDEO" -i "$SOURCE" -map 0:v:0 -map '1:a?' -c:v copy -c:a copy -map_metadata 1 "$CLEANED_MEDIA"`.
+11. Compare source and cleaned `avg_frame_rate` explicitly with `ffprobe`, then run `"$SKILL_DIR/scripts/verify-video.sh" "$CLEANED_MEDIA" "$JOB_DIR/verify" --source "$SOURCE"`. The helper checks display geometry, duration tolerance, full decodability, 1 fps sheet generation, audio presence when the source has audio, and `source_identity` — that `$SOURCE` is not byte-identical to `$CLEANED_MEDIA`, since a file compared against itself proves nothing. It does not prove audio identity or FPS equality; the remux and separate FPS comparison are mandatory.
+12. Trim only an end card the user explicitly confirmed. Record one approved `TRIM_START`/`TRIM_END` interval and apply it identically to the restored picture and preserved source audio. Use `-shortest` and quoted optional maps when creating `$TRIMMED_CLEANED_MEDIA`, then create `$TRIMMED_SOURCE_REFERENCE` from the same source interval:
 
     ```bash
     ffmpeg -nostdin \
@@ -38,16 +39,18 @@ Read this sequence completely before submitting any HitPaw job. HitPaw is a paid
     "$SKILL_DIR/scripts/verify-video.sh" "$TRIMMED_CLEANED_MEDIA" "$JOB_DIR/verify-trimmed" --source "$TRIMMED_SOURCE_REFERENCE"
     ```
 
-    Compare the trimmed files' `avg_frame_rate` separately as in step 10, document the approved interval, and use `$TRIMMED_CLEANED_MEDIA` as the deliverable. Never remux full-length source audio after trimming and never verify trimmed output against the full source.
-12. Compare the raw HitPaw result against the source anywhere full-frame repair may have damaged food, hands, tools, packaging, or UI. Do not promote damaged output merely because decoding succeeds.
+    Compare the trimmed files' `avg_frame_rate` separately as in step 11, document the approved interval, and use `$TRIMMED_CLEANED_MEDIA` as the deliverable. Never remux full-length source audio after trimming and never verify trimmed output against the full source.
+13. Compare the raw HitPaw result against the source anywhere full-frame repair may have damaged food, hands, tools, packaging, or UI. Do not promote damaged output merely because decoding succeeds.
 
 ## Operational batch manifest
 
 Store one record per file with these fields:
 
 - `source`
+- `source_resolution`
 - `working_copy`
 - `subtitle_region`
+- `export_resolution`
 - `full_frame_warning`
 - `approval`
 - `submission_status`

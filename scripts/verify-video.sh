@@ -42,6 +42,18 @@ import os,sys
 a=os.stat(sys.argv[1]);b=os.stat(sys.argv[2]);raise SystemExit(0 if os.path.realpath(sys.argv[1])==os.path.realpath(sys.argv[2]) or (a.st_dev,a.st_ino)==(b.st_dev,b.st_ino) else 1)
 PY
 then fail_report source_alias "cleaned and source must be distinct files"; fi
+source_identical=false
+if [[ -n "$source" ]] && python3 - "$cleaned" "$source" <<'PY'
+import hashlib,os,sys
+def digest(p):
+    h=hashlib.sha256()
+    with open(p,'rb') as fh:
+        for chunk in iter(lambda:fh.read(1024*1024),b''):h.update(chunk)
+    return h.digest()
+a,b=sys.argv[1:3]
+raise SystemExit(0 if os.stat(a).st_size==os.stat(b).st_size and digest(a)==digest(b) else 1)
+PY
+then source_identical=true; fi
 
 clean_probe="$stage/probe.json"; source_probe=''
 ffprobe -v error -show_format -show_streams -of json "$cleaned" >"$clean_probe" 2>/dev/null || fail_report cleaned_probe "ffprobe could not read cleaned media"
@@ -52,10 +64,10 @@ ffmpeg -nostdin -v error -i "$cleaned" -map 0:v:0 -vf "fps=1:start_time=0:round=
 sheets=("$stage"/sheet-*.png); [[ ${#sheets[@]} -gt 0 ]] || render_pass=false
 sheet_count=${#sheets[@]}
 
-result=$(python3 - "$clean_probe" "$source_probe" "$decode_pass" "$render_pass" "$sheet_count" "$stage/report.json" <<'PY'
+result=$(python3 - "$clean_probe" "$source_probe" "$decode_pass" "$render_pass" "$sheet_count" "$source_identical" "$stage/report.json" <<'PY'
 from fractions import Fraction
 import json,math,sys
-cp,sp,decode,render,count,out=sys.argv[1:]
+cp,sp,decode,render,count,identical,out=sys.argv[1:]
 def load(p):
     with open(p,encoding='utf-8') as h:return json.load(h)
 def ratio(v):
@@ -87,6 +99,7 @@ try:
 except Exception as exc:
     clean=None;checks['cleaned_video_metadata']={'pass':False,'error':str(exc)}
 if sp:
+    checks['source_identity']={'pass':identical!='true','values':{'byte_identical_to_cleaned':identical=='true'},**({'error':'source is byte-identical to cleaned, so every source comparison below is vacuous; supply the media as it existed BEFORE subtitle removal'} if identical=='true' else {})}
     try:
         original=facts(load(sp));
         if clean is None:raise ValueError('cleaned metadata invalid')
