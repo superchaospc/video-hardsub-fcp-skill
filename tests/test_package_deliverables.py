@@ -68,6 +68,7 @@ def package_fixture(
     packaged_plan: dict | None = None,
     verification: dict | None = None,
     xml_mutator=None,
+    media_mutator=None,
 ):
     job = root / "private-job"
     job.mkdir()
@@ -99,6 +100,8 @@ def package_fixture(
         cuts.write_text(json.dumps(package_plan) + "\n", encoding="utf-8")
     if xml_mutator is not None:
         xml_mutator(fcpxml)
+    if media_mutator is not None:
+        media_mutator(cleaned)
     verification_path = job / "verification.json"
     verification_path.write_text(
         json.dumps(
@@ -150,6 +153,34 @@ class PackageDeliverablesTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0, completed.stdout)
             self.assertFalse(archive.exists())
             return completed
+
+    def test_ignores_credential_like_bytes_in_encoded_media_payload(self):
+        def append_payload(path):
+            with path.open("ab") as handle:
+                handle.write(b"\nalice@example.com\n")
+
+        with tempfile.TemporaryDirectory() as directory:
+            completed, archive, _ = package_fixture(
+                Path(directory), media_mutator=append_payload
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(archive.is_file())
+
+    def test_rejects_credentials_in_media_metadata(self):
+        def add_sensitive_metadata(path):
+            replacement = path.with_name("metadata.mp4")
+            subprocess.run(
+                [
+                    "ffmpeg", "-nostdin", "-v", "error", "-i", str(path),
+                    "-map", "0", "-c", "copy", "-metadata",
+                    "comment=token=secret-value", str(replacement),
+                ],
+                check=True,
+            )
+            replacement.replace(path)
+
+        completed = self.assert_package_rejected(media_mutator=add_sensitive_metadata)
+        self.assertIn("account or credential data", completed.stderr)
 
     def test_archive_preserves_explicit_no_cuts_review_decision(self):
         with tempfile.TemporaryDirectory() as directory:
