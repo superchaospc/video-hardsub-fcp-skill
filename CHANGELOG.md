@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-08
+
+### Fixed
+
+- Packaging scanned every byte of the cleaned media for email addresses and signed-URL fragments. Compressed video is effectively random data, so those patterns appeared by chance and rejected legitimate deliveries, while a real credential would never live in the bitstream to begin with.
+
+### Changed
+
+- The credential scan for cleaned media now reads `format_tags` and `stream_tags` via `ffprobe` and passes them through the same `scan_json` used for the JSON deliverables, catching the case that can actually occur instead of the one that cannot.
+
 ## [1.2.0] - 2026-09-08
 
 ### Fixed
@@ -51,7 +61,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Decode, geometry, duration, audio-presence, XML, package-integrity, privacy, and repository validation.
 - Deterministic batch delivery archives with sanitized manifests and SHA-256 checksums.
 
-[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/releases/tag/v1.0.0
