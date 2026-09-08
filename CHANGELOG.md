@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-08
+
+### Fixed
+
+- An upstream downscale could reach delivery unreported. When subtitles had been removed elsewhere and only cutting was requested, the workflow had no defined `$SOURCE`, so the delivered file was passed to `verify-video.sh` as its own `--source`; `source_display_geometry` then compared a file to itself and passed. A 720x1280 source delivered as 608x1080 was reported as matching the source.
+- `verify-video.sh` gained a `source_identity` check that fails when `--source` is byte-identical to the cleaned media. The existing `source_alias` check only caught the same inode, not a copy.
+
+### Added
+
+- An explicit entry path for media whose subtitles were removed elsewhere: the pre-removal original must be supplied as `$SOURCE`, or the report must state that resolution, frame rate, and duration could not be verified.
+- `source_resolution` and `export_resolution` manifest fields.
+
+### Changed
+
+- HitPaw's export resolution must be set to the source's exact dimensions and recorded before submission. Its presets are named by one dimension, so a 720x1280 source silently exports as 608x1080 unless set explicitly.
+- Rescaling a downscaled result back to source dimensions is now a disclosed last resort rather than an unqualified step. It satisfies `source_display_geometry` without restoring any detail, so it must never be done silently.
+
 ## [1.1.0] - 2026-08-25
 
 ### Changed
@@ -34,6 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Decode, geometry, duration, audio-presence, XML, package-integrity, privacy, and repository validation.
 - Deterministic batch delivery archives with sanitized manifests and SHA-256 checksums.
 
-[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/releases/tag/v1.0.0
