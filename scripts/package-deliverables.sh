@@ -116,14 +116,6 @@ allowed_ext = {
     "cuts": {".json"},
     "verification": {".json"},
 }
-binary_sensitive = re.compile(
-    rb"(?:[?&](?:token|signature|expires|x-amz-[^=&#\s]*|credential|key|auth|sig)=|bearer\s+|ossaccesskeyid|x-amz-signature)",
-    re.I,
-)
-email_address = re.compile(
-    rb"(?<![A-Z0-9.!#$%&'*+/=?^_`{|}~-])[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)+",
-    re.I,
-)
 email_text = re.compile(r"(?<![A-Z0-9.!#$%&'*+/=?^_`{|}~-])[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)+", re.I)
 sensitive_keys = re.compile(r"email|(?:^|[_-])(?:account|user|credential|token|auth|key|secret|password|authorization|signature|expires)(?:$|[_-])|^(?:x-amz-.*|ossaccesskeyid|access[_-]?token|api[_-]?key|secret[_-]?key|signed[_-]?url|user(?:name|id)|account(?:name|id)|task[_-]?(?:id|uuid)|sig)$", re.I)
 query_secret = re.compile(r"^(?:token|signature|expires|x-amz-.*|credential|key|auth|sig|ossaccesskeyid)$", re.I)
@@ -343,7 +335,6 @@ for ordinal, (manifest_index, entry) in enumerate(complete, 1):
             if not stat.S_ISREG(opened.st_mode) or (opened.st_dev,opened.st_ino,opened.st_size,opened.st_mtime_ns,opened.st_ctime_ns) != before:
                 fail(f"complete entry {manifest_index + 1} {kind} changed during packaging")
             digest = hashlib.sha256()
-            media_overlap = b""
             with os.fdopen(descriptor, "rb", closefd=False) as source, destination.open("xb") as target:
                 while True:
                     chunk = source.read(1024 * 1024)
@@ -351,12 +342,6 @@ for ordinal, (manifest_index, entry) in enumerate(complete, 1):
                         break
                     digest.update(chunk)
                     target.write(chunk)
-                    if kind == "cleaned":
-                        window=media_overlap+chunk
-                        if email_address.search(window) or binary_sensitive.search(window):
-                            destination.unlink(missing_ok=True)
-                            fail(f"complete entry {manifest_index + 1} cleaned contains account or credential data")
-                        media_overlap=window[-4096:]
             after=path.stat()
             if (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns) != before:
                 destination.unlink(missing_ok=True)
@@ -366,6 +351,21 @@ for ordinal, (manifest_index, entry) in enumerate(complete, 1):
         if kind == "cleaned":
             checked=subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=index","-of","csv=p=0",str(destination)],capture_output=True,text=True)
             if checked.returncode or not checked.stdout.strip(): fail(f"complete entry {manifest_index + 1} cleaned is not valid media")
+            metadata_checked=subprocess.run(
+                ["ffprobe","-v","error","-show_entries","format_tags:stream_tags","-of","json",str(destination)],
+                capture_output=True,
+                text=True,
+            )
+            if metadata_checked.returncode:
+                fail(f"complete entry {manifest_index + 1} cleaned metadata could not be inspected")
+            try:
+                media_metadata=json.loads(metadata_checked.stdout)
+            except json.JSONDecodeError:
+                fail(f"complete entry {manifest_index + 1} cleaned metadata is not valid JSON")
+            try:
+                scan_json(media_metadata)
+            except SystemExit:
+                fail(f"complete entry {manifest_index + 1} cleaned contains account or credential data")
             try:
                 cleaned_probe=fcpxml_validator.probe_media(destination)
             except Exception as exc:
