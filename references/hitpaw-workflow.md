@@ -6,10 +6,10 @@ Read this sequence completely before submitting any HitPaw job. HitPaw is a paid
 
 1. Create a dedicated ASCII-only work root. Copy each MP4/MOV into its own folder; never edit or upload the source in place.
 2. Run `"$SKILL_DIR/scripts/inspect-video.sh" "$WORKING_COPY" "$JOB_DIR/inspect"` and inspect the metadata plus full-frame and subtitle-band contact sheets.
-3. Select a per-file region. Use a tight band for fixed captions. Use full frame for moving captions only after warning that generative repair can damage food, hands, tools, packaging, or UI.
+3. Select a per-file region from a full-height row scan, never from the contact sheets: at thumbnail scale a low-contrast cue is invisible, and an outlying cue is exactly the one that hides. Union every row band the scan reports across the clip, then pad it. Use a tight band for fixed captions. Use full frame for moving captions only after warning that generative repair can damage food, hands, tools, packaging, or UI.
 4. Set HitPaw's export resolution to the source's exact `width`x`height` before submitting, and record it as `export_resolution` in the manifest entry. HitPaw's presets are named by one dimension ("1080"), so a 720x1280 source silently exports as 608x1080 unless the resolution is set explicitly. Verify the setting in the export dialog rather than assuming the default preserves it — this is the only step that actually preserves resolution; every later check can only detect the loss.
 5. Confirm desktop-control capability. Without it, stop before submission and state that no job was submitted.
-6. Prepare one batch manifest and obtain one confirmation for the exact files, regions, full-frame risks, and total paid-credit use. Never silently purchase or consume credits.
+6. Read the AI-credit balance in HitPaw's header first and check the batch against it, so the confirmation you ask for is one you can actually honour. The Remove button prints the per-job price beside the balance. If the balance will not cover every entry, say which entries it covers and stop there. Then prepare one batch manifest and obtain one confirmation for the exact files, regions, full-frame risks, and total paid-credit use. Never silently purchase or consume credits, and never purchase them at all.
 7. If HitPaw rejects the working media, create a compatibility MP4 inside the job folder while retaining the working copy:
 
    ```bash
@@ -17,7 +17,7 @@ Read this sequence completely before submitting any HitPaw job. HitPaw is a paid
    ```
 
 8. Process paid jobs sequentially per manifest entry: submit one approved file once, immediately record its `submission_status`, then wait for or recover that file's result before submitting the next entry. This prevents concurrent or out-of-order completions from being assigned to the wrong source. Do not submit the same entry again after a slow render, stalled download, timeout, restart, or ambiguous UI state.
-9. Wait for or recover the existing completion from HitPaw's local logs. Do not paste raw logs or signed URLs into the manifest. If jobs were already submitted concurrently, set `HITPAW_LOG_FILE` to the job-specific log for each recovery and stop for human resolution if the source-to-result mapping is not unambiguous:
+9. Wait for or recover the existing completion from HitPaw's local logs. Edimakor writes the finished URL under `removeWatermark result url:` or, when the app's own download failed and the card reads "Failed to download", under `FileReady url:` instead; the fetch script matches both and takes whichever came last. A "Failed to download" card means the render finished and only the transfer failed, so recover it rather than resubmitting. Do not paste raw logs or signed URLs into the manifest. If jobs were already submitted concurrently, set `HITPAW_LOG_FILE` to the job-specific log for each recovery and stop for human resolution if the source-to-result mapping is not unambiguous:
 
    ```bash
    "$SKILL_DIR/scripts/fetch-hitpaw-result.sh" --wait "$JOB_DIR/hitpaw-raw.mp4"

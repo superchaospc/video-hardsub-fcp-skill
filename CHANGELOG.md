@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Result recovery matched only `removeWatermark result url:` in the Edimakor log. A job whose render succeeded but whose in-app download failed logs the finished URL under `FileReady url:` instead, so the fetch script reported no result for a job that was sitting complete on the server. Both markers are now matched, newest wins.
+
+### Changed
+
+- The subtitle region is chosen from a full-height row scan rather than from the contact sheets, and the same scan is run on the result to prove every cue was covered. Contact sheets are scaled down far enough to hide a low-contrast cue, and the outlying cue is the one they hide; a missed cue costs a second paid job.
+- The credit balance is read before asking for batch approval, so the confirmation requested is one that can actually be honoured. Purchasing credits is out of scope in all cases.
+
 ## [1.3.0] - 2026-09-08
 
 ### Fixed
