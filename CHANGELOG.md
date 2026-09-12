@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-12
+
 ### Fixed
 
 - Result recovery matched only `removeWatermark result url:` in the Edimakor log. A job whose render succeeded but whose in-app download failed logs the finished URL under `FileReady url:` instead, so the fetch script reported no result for a job that was sitting complete on the server. Both markers are now matched, newest wins.
@@ -70,7 +72,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Decode, geometry, duration, audio-presence, XML, package-integrity, privacy, and repository validation.
 - Deterministic batch delivery archives with sanitized manifests and SHA-256 checksums.
 
-[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.0.0...v1.1.0
