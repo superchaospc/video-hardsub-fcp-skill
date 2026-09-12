@@ -52,7 +52,9 @@ A resolution mismatch found here is reported, not repaired: tell the user the so
 ```
 
 - Inspect both contact sheets for every file. Group files only when their visible layouts support the same region; store the decision per file.
+- Measure caption position by scanning every row of the frame, from 0 to the full height, not by reading it off a contact sheet. Sheets are scaled down far enough to hide a low-contrast cue, and the cue that sits away from the others is the one they hide. Take the union of every row band the scan reports across the whole clip, then pad it. Padding costs nothing because pixels outside the region come from the source; missing one cue costs a second paid job.
 - Use a tight band for a fixed caption. A moving caption requires full-frame removal and an explicit warning that hands, food, tools, packaging, or UI may be damaged. Preserve the raw HitPaw output separately.
+- After removal, run the same full-height scan on the result. An empty result on every frame is what proves the region covered every cue; a handful of thumbnails does not.
 
 ## HitPaw submission boundary
 

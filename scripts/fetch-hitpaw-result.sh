@@ -42,7 +42,7 @@ scan_logs() {
   python3 - "$log_dir" "$mode" "$state" "$budget" "${HITPAW_LOG_FILE:-}" <<'PY'
 import datetime as dt, hashlib, json, os, re, sys, time
 root,mode,state_path,budget,selected=sys.argv[1:]; end=time.monotonic()+max(0.0,float(budget))
-MARK=re.compile(rb"removeWatermark result url:\s*[\"']?(https://[^\s\"'<>]+)")
+MARK=re.compile(rb"(?:removeWatermark result url|FileReady url):\s*[\"']?(https://[^\s\"'<>]+)")
 STAMP=re.compile(rb'(\d{4}-\d{2}-\d{2}[T ][0-2]\d:[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d\d:?\d\d)?)')
 CHECK=4096; CHUNK=65536; OVERLAP=65536
 def stamp(window,marker_start):
