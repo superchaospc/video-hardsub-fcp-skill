@@ -43,9 +43,15 @@ ffmpeg -nostdin -v error \
   -c:v libx264 -crf 0 -preset ultrafast -g 300 -keyint_min 300 -sc_threshold 0 \
   -c:a aac -b:a 128k -movflags +faststart "$source_media"
 
-# The integration treats this distinct file as the already-cleaned result.
-# A byte copy preserves frame timing while giving the packager a distinct inode.
-cp "$source_media" "$cleaned_media"
+# The integration treats a remux as the restored, subtitle-free result: frame
+# timing is preserved, but it is not a byte copy, so source_identity can pass.
+restored_media="$job/restored.mp4"
+ffmpeg -nostdin -v error -i "$source_media" -map 0 -c copy -metadata comment=restored "$restored_media"
+bash "$repo_root/scripts/verify-video.sh" \
+  "$restored_media" "$job/verify-restored" --source "$source_media"
+
+# The delivered media is always conformed to the vertical 1080x1920 format.
+bash "$repo_root/scripts/conform-vertical.sh" "$restored_media" "$cleaned_media"
 
 python3 "$repo_root/scripts/analyze-cuts.py" "$cleaned_media" \
   --output "$cut_plan" \
@@ -137,7 +143,7 @@ if abs(clip_duration - media_duration) > one_frame:
 PY
 
 bash "$repo_root/scripts/verify-video.sh" \
-  "$cleaned_media" "$verify_dir" --source "$source_media"
+  "$cleaned_media" "$verify_dir" --source "$source_media" --delivery-size 1080x1920
 
 python3 - "$manifest" "$source_media" "$cleaned_media" "$fcpxml" \
   "$cut_plan" "$verify_dir/report.json" <<'PY'

@@ -24,6 +24,10 @@ from urllib.parse import unquote, urlparse
 
 
 FCPXML_VERSION = "1.10"
+# Every timeline is a vertical 1080x1920 project, whatever the media resolution.
+# The asset keeps its own format so Final Cut Pro fits the media into the project.
+PROJECT_WIDTH = 1080
+PROJECT_HEIGHT = 1920
 PLAN_VERSION = 1
 REJECTION_REASONS = frozenset(
     {
@@ -130,6 +134,25 @@ def _audio_details(
     return (probe.audio_channels, probe.audio_sample_rate, probe.audio_sources)
 
 
+def _format_attributes(
+    format_id: str, width: int, height: int, frame_duration: str
+) -> dict[str, str]:
+    return {
+        "id": format_id,
+        "name": f"FFVideoFormat{width}x{height}",
+        "frameDuration": frame_duration,
+        "width": str(width),
+        "height": str(height),
+    }
+
+
+def _asset_format_id(info: MediaInfo) -> str:
+    """Share the project format only when the media already has its dimensions."""
+    if (info.width, info.height) == (PROJECT_WIDTH, PROJECT_HEIGHT):
+        return "r1"
+    return "r3"
+
+
 def build_fcpxml(source: Path, info: MediaInfo, cuts: Sequence[int], event_name: str) -> str:
     """Create one asset and contiguous asset clips covering every source frame once."""
     return _build_fcpxml(source, info, cuts, event_name, None)
@@ -151,17 +174,19 @@ def _build_fcpxml(
 
     root = ET.Element("fcpxml", {"version": FCPXML_VERSION})
     resources = ET.SubElement(root, "resources")
+    frame_duration = frames_to_time(1, info.fps)
     ET.SubElement(
         resources,
         "format",
-        {
-            "id": "r1",
-            "name": f"FFVideoFormat{info.width}x{info.height}",
-            "frameDuration": frames_to_time(1, info.fps),
-            "width": str(info.width),
-            "height": str(info.height),
-        },
+        _format_attributes("r1", PROJECT_WIDTH, PROJECT_HEIGHT, frame_duration),
     )
+    asset_format = _asset_format_id(info)
+    if asset_format != "r1":
+        ET.SubElement(
+            resources,
+            "format",
+            _format_attributes(asset_format, info.width, info.height, frame_duration),
+        )
     duration = frames_to_time(info.frame_count, info.fps)
     asset_attributes = {
         "id": "r2",
@@ -169,7 +194,7 @@ def _build_fcpxml(
         "start": "0s",
         "duration": duration,
         "hasVideo": "1",
-        "format": "r1",
+        "format": asset_format,
         "videoSources": "1",
     }
     if info.has_audio:
@@ -678,25 +703,35 @@ def _verify_fcpxml(
     if root.tag != "fcpxml" or root.attrib.get("version") != FCPXML_VERSION:
         raise ValueError(f"generated document must be FCPXML {FCPXML_VERSION}")
 
-    formats = root.findall("./resources/format")
+    formats = {item.attrib.get("id"): item for item in root.findall("./resources/format")}
     assets = root.findall("./resources/asset")
-    if len(formats) != 1 or len(assets) != 1:
-        raise ValueError("FCPXML must contain exactly one format and one asset resource")
-    format_resource, asset = formats[0], assets[0]
-    if (
-        format_resource.attrib.get("id") != "r1"
-        or format_resource.attrib.get("frameDuration") != frames_to_time(1, info.fps)
-        or format_resource.attrib.get("width") != str(info.width)
-        or format_resource.attrib.get("height") != str(info.height)
-    ):
-        raise ValueError("FCPXML format metadata does not match probed media")
+    asset_format = _asset_format_id(info)
+    if set(formats) != {"r1", asset_format} or len(assets) != 1:
+        raise ValueError(
+            "FCPXML must contain the project format, the media format, and one asset"
+        )
+    asset = assets[0]
+    frame_duration = frames_to_time(1, info.fps)
+    expected_formats = {
+        "r1": (PROJECT_WIDTH, PROJECT_HEIGHT),
+        asset_format: (info.width, info.height),
+    }
+    for format_id, (width, height) in expected_formats.items():
+        format_resource = formats[format_id]
+        if (
+            format_resource.attrib.get("frameDuration") != frame_duration
+            or format_resource.attrib.get("width") != str(width)
+            or format_resource.attrib.get("height") != str(height)
+        ):
+            label = "project" if format_id == "r1" else "media"
+            raise ValueError(f"FCPXML {label} format metadata is wrong")
     media_reps = asset.findall("media-rep")
     if len(media_reps) != 1:
         raise ValueError("asset must contain exactly one media representation")
     expected_total = Fraction(info.frame_count, 1) / info.fps
     if (
         asset.attrib.get("id") != "r2"
-        or asset.attrib.get("format") != "r1"
+        or asset.attrib.get("format") != asset_format
         or asset.attrib.get("hasVideo") != "1"
         or _parse_time(asset.attrib.get("start")) != 0
         or _parse_time(asset.attrib.get("duration")) != expected_total
@@ -734,6 +769,8 @@ def _verify_fcpxml(
     if len(sequences) != 1:
         raise ValueError("FCPXML must contain exactly one sequence")
     sequence = sequences[0]
+    if sequence.attrib.get("format") != "r1":
+        raise ValueError("sequence must use the 1080x1920 project format")
     expected_sequence_rate = (
         SEQUENCE_AUDIO_RATES.get(audio[1]) if audio is not None else None
     )

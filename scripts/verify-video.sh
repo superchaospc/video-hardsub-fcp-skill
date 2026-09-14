@@ -2,11 +2,18 @@
 set -euo pipefail
 shopt -s nullglob
 
-usage() { printf 'Usage: %s CLEANED VERIFY_DIR [--source SOURCE]\nVERIFY_DIR must not already exist (artifacts publish atomically).\n' "$0" >&2; }
+usage() { printf 'Usage: %s CLEANED VERIFY_DIR [--source SOURCE] [--delivery-size WIDTHxHEIGHT]\nVERIFY_DIR must not already exist (artifacts publish atomically).\nWith --delivery-size, geometry is checked against that size instead of the source.\n' "$0" >&2; }
 die() { printf 'verify-video: %s\n' "$*" >&2; exit 1; }
-[[ $# -eq 2 || ($# -eq 4 && $3 == --source) ]] || { usage; exit 2; }
+[[ $# -ge 2 ]] || { usage; exit 2; }
+cleaned=$1; verify_dir=$2; source=''; delivery_size=''; shift 2
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --source) [[ $# -ge 2 && -z $source ]] || { usage; exit 2; }; source=$2; shift 2 ;;
+    --delivery-size) [[ $# -ge 2 && -z $delivery_size && $2 =~ ^[1-9][0-9]*x[1-9][0-9]*$ ]] || { usage; exit 2; }; delivery_size=$2; shift 2 ;;
+    *) usage; exit 2 ;;
+  esac
+done
 for tool in python3 ffmpeg ffprobe; do command -v "$tool" >/dev/null 2>&1 || die "required tool not found: $tool"; done
-cleaned=$1; verify_dir=$2; source=''; [[ $# -eq 2 ]] || source=$4
 [[ ! -e "$verify_dir" && ! -L "$verify_dir" ]] || die "verification directory already exists; choose a new path"
 parent=$(dirname "$verify_dir"); mkdir -p "$parent" || die "could not create verification parent"; [[ ! -L "$parent" ]] || die "verification parent must not be a symlink"
 parent=$(cd "$parent" && pwd -P); verify_dir="$parent/$(basename "$verify_dir")"
@@ -64,10 +71,10 @@ ffmpeg -nostdin -v error -i "$cleaned" -map 0:v:0 -vf "fps=1:start_time=0:round=
 sheets=("$stage"/sheet-*.png); [[ ${#sheets[@]} -gt 0 ]] || render_pass=false
 sheet_count=${#sheets[@]}
 
-result=$(python3 - "$clean_probe" "$source_probe" "$decode_pass" "$render_pass" "$sheet_count" "$source_identical" "$stage/report.json" <<'PY'
+result=$(python3 - "$clean_probe" "$source_probe" "$decode_pass" "$render_pass" "$sheet_count" "$source_identical" "$stage/report.json" "$delivery_size" <<'PY'
 from fractions import Fraction
 import json,math,sys
-cp,sp,decode,render,count,identical,out=sys.argv[1:]
+cp,sp,decode,render,count,identical,out,delivery=sys.argv[1:]
 def load(p):
     with open(p,encoding='utf-8') as h:return json.load(h)
 def ratio(v):
@@ -98,13 +105,18 @@ try:
     clean=facts(load(cp));public={k:v for k,v in clean.items() if not k.startswith('_')};checks['cleaned_video_metadata']={'pass':True,'values':public}
 except Exception as exc:
     clean=None;checks['cleaned_video_metadata']={'pass':False,'error':str(exc)}
+if delivery:
+    dw,dh=map(int,delivery.split('x'))
+    ok=clean is not None and (clean['width'],clean['height'])==(dw,dh) and clean['_display']==(Fraction(dw),Fraction(dh))
+    checks['delivery_geometry']={'pass':ok,'values':{'expected':[dw,dh],'cleaned':list(map(float,clean['_display'])) if clean else None}}
 if sp:
     checks['source_identity']={'pass':identical!='true','values':{'byte_identical_to_cleaned':identical=='true'},**({'error':'source is byte-identical to cleaned, so every source comparison below is vacuous; supply the media as it existed BEFORE subtitle removal'} if identical=='true' else {})}
     try:
         original=facts(load(sp));
         if clean is None:raise ValueError('cleaned metadata invalid')
         geometry=clean['_display']==original['_display'];audio=not original['has_audio'] or clean['has_audio'];allowed=max(.20,2/original['fps']);drift=abs(clean['duration_seconds']-original['duration_seconds']);duration=drift<=allowed+1e-9
-        checks['source_display_geometry']={'pass':geometry,'values':{'source':list(map(float,original['_display'])),'cleaned':list(map(float,clean['_display']))}}
+        if not delivery:
+            checks['source_display_geometry']={'pass':geometry,'values':{'source':list(map(float,original['_display'])),'cleaned':list(map(float,clean['_display']))}}
         checks['source_audio_preserved']={'pass':audio,'values':{'source_has_audio':original['has_audio'],'cleaned_has_audio':clean['has_audio']}}
         checks['source_duration_drift']={'pass':duration,'values':{'drift_seconds':drift,'allowed_seconds':allowed}}
     except Exception as exc:checks['source_comparison']={'pass':False,'error':str(exc)}

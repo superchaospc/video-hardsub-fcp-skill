@@ -18,8 +18,9 @@
 - 先生成全片接触表，再为每个视频选择尽可能小的字幕区域。
 - 通过 HitPaw Edimakor 去除烧录在画面里的硬字幕，并从本地日志安全恢复已经完成的任务，避免重复消耗付费次数。
 - 以高召回模式检测明显镜头切换和同机位微跳剪，为每个候选点生成前后帧复核图。
+- 交付媒体和 FCPXML 工程统一为竖屏 1080×1920，导入 Final Cut Pro 即是竖屏时间线，不需要再手动改工程设置。
 - 保留清理后视频和音频的完整顺序，在 FCPXML 时间线中建立可继续编辑的切段。
-- 完整解码验证媒体，检查画面几何、音频存在性、时长、FCPXML 连续性和交付包校验和。
+- 完整解码验证媒体，检查画面几何、交付尺寸、音频存在性、时长、FCPXML 连续性和交付包校验和。
 
 ## 前置条件
 
@@ -70,10 +71,10 @@ bash scripts/install.sh --source "$PWD"
 
 每个源视频对应一组结果：
 
-- `cleaned.mp4` 或 `cleaned.mov`：去字幕并恢复源画面几何、源音频后的媒体。
-- `project.fcpxml`：可直接导入 Final Cut Pro 的连续切段时间线。
+- `cleaned.mp4` 或 `cleaned.mov`：去字幕、保留源音频的竖屏 1080×1920 媒体（见下文“竖屏 1080×1920 交付”）。
+- `project.fcpxml`：可直接导入 Final Cut Pro 的连续切段时间线，工程格式固定为 1080×1920。
 - `cut-plan.json`：所有候选切点、批准项与拒绝原因。
-- `verify/report.json`：媒体验证摘要（ZIP 内重命名为 `verification.json`）。
+- `verify-delivery/report.json`：交付媒体的验证摘要（ZIP 内重命名为 `verification.json`）。转换前对恢复媒体的校验保存在 `verify/report.json`，留在工作目录中。
 - 可选 ZIP：只包含完成条目、去标识化清单和 `SHA256SUMS`；每个 `entry-NNN` 内的归档专用 FCPXML 使用同目录相对媒体引用，不保留本机工作路径。
 
 验证交付包：
@@ -88,6 +89,17 @@ unzip deliverables.zip -d verified-delivery
 请先完整解压 ZIP，再从对应的 `entry-NNN` 目录导入 `project.fcpxml`；不要把 XML 与同目录的 `cleaned.mp4`/`cleaned.mov` 分开移动。归档后的切段计划保留候选帧、批准项和拒绝原因，但会移除本机工作目录、复核图路径等非交付字段。
 
 FCPXML 中的切段是同一清理媒体上的可编辑边界，不会把视频强制导出成许多独立碎片；所有源帧按原顺序恰好出现一次。
+
+## 竖屏 1080×1920 交付
+
+无论原片是 720×1280、608×1080 还是横屏 1920×1080，交付的 `cleaned` 媒体和 FCPXML 工程都是 1080×1920。
+
+- `scripts/conform-vertical.sh` 在媒体流程最后一步完成转换：等比缩放到能放进 1080×1920 的最大尺寸，比例不是 9:16 时居中并补黑边。不裁切、不拉伸，不丢帧也不改帧率，音频直接复制。
+- 已经是 1080×1920 方形像素且无旋转的素材只做流复制，不重新压缩；其他尺寸以 x264 CRF 16 重新编码。
+- 转换后校验帧数与原来一致，并运行 `verify-video.sh --delivery-size 1080x1920` 确认交付尺寸，同时仍对照原片检查时长、音频和完整解码。
+- FCPXML 工程格式固定为 1080×1920；素材资源保留自身真实尺寸的格式，让 Final Cut Pro 正确适配画面。
+
+放大不会补回细节，所以顺序是固定的：先把去字幕后的恢复媒体按**原片分辨率**校验，再转成 1080×1920。如果 HitPaw 或其他去字幕工具把 720×1280 悄悄降成了 608×1080，这一步会失败并写入报告；之后的放大只是交付格式，不会被当成修复，也不会掩盖这次降分辨率。
 
 ## 为什么还要精细复核
 
@@ -107,6 +119,7 @@ FCPXML 中的切段是同一清理媒体上的可编辑边界，不会把视频�
 
 ## 局限
 
+- 交付尺寸固定为 1080×1920。横屏或非 9:16 素材会带黑边，不会自动裁切铺满；原片低于 1080×1920 时，转换只是放大，不增加细节。
 - 只支持 macOS 上的 MP4/MOV 工作流；桌面自动化取决于当前宿主的可用能力和 HitPaw 界面状态。
 - 去字幕质量取决于 HitPaw 的生成式修复。复杂背景、移动字幕或全画面模式必须人工目检。
 - 跳剪检测以减少漏检为目标，但视觉复核仍是必需步骤；它不能保证理解所有创作意图。
@@ -123,7 +136,7 @@ bash -n scripts/*.sh
 python3 scripts/validate-skill.py .
 ```
 
-合成集成测试会在临时目录生成三个短镜头，验证精细切点检测、完整人工分类结构、FCPXML 时长、Apple FCPXML 1.10 DTD（本机可用时）、工作目录移走后的归档媒体解析和 ZIP 校验和；运行结束后会自动清理测试媒体。
+合成集成测试会在临时目录生成三个短镜头，验证按原片校验恢复媒体、转换为 1080×1920 并校验交付尺寸、精细切点检测、完整人工分类结构、FCPXML 时长、Apple FCPXML 1.10 DTD（本机可用时）、工作目录移走后的归档媒体解析和 ZIP 校验和；运行结束后会自动清理测试媒体。
 
 ## 许可证
 
@@ -131,4 +144,4 @@ python3 scripts/validate-skill.py .
 
 ## English summary
 
-Video Hardsub → FCP is a macOS Agent Skill shared by Codex and Claude Code. Give an agent one or more hard-subtitled MP4/MOV files and say `去字幕切段`; it coordinates explicit paid-job approval, safe HitPaw result recovery, high-recall jump-cut review, media verification, and an editable Final Cut Pro FCPXML timeline. Review sheets show each candidate as four consecutive frames so continuous motion can be told apart from a real cut, and pages adapt to the source aspect ratio. HitPaw Edimakor and Final Cut Pro are proprietary user-installed prerequisites and are not bundled.
+Video Hardsub → FCP is a macOS Agent Skill shared by Codex and Claude Code. Give an agent one or more hard-subtitled MP4/MOV files and say `去字幕切段`; it coordinates explicit paid-job approval, safe HitPaw result recovery, high-recall jump-cut review, media verification, and an editable Final Cut Pro FCPXML timeline. Every delivery is vertical 1080x1920: the cleaned media is fit-scaled onto that frame (black padding when the aspect is not 9:16, never cropped or stretched, every frame kept) and the FCPXML project uses a 1080x1920 format. The restored media is verified against the source resolution before that conform, so an upstream downscale is still reported rather than hidden by the upscale. Review sheets show each candidate as four consecutive frames so continuous motion can be told apart from a real cut, and pages adapt to the source aspect ratio. HitPaw Edimakor and Final Cut Pro are proprietary user-installed prerequisites and are not bundled.
