@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-14
+
 ### Added
 
 - `scripts/conform-vertical.sh` converts the cleaned media to the 1080x1920 delivery format: fit-scaled, centred on black when the aspect is not 9:16, never cropped or stretched, audio copied, every frame kept. Media that is already 1080x1920 is stream-copied.
@@ -87,7 +89,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Decode, geometry, duration, audio-presence, XML, package-integrity, privacy, and repository validation.
 - Deterministic batch delivery archives with sanitized manifests and SHA-256 checksums.
 
-[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.1.0...v1.2.0
