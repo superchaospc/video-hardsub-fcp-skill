@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Every generated FCPXML timeline now uses a vertical 1080x1920 project format, regardless of the cleaned media's resolution. Previously the project copied the media's dimensions, so a 720x1280 or 608x1080 file produced a project of that size. The asset keeps its own format with the real media dimensions, so Final Cut Pro fits it into the 1080x1920 project; media that is already 1080x1920 shares the project format.
+
 ## [1.4.0] - 2026-09-12
 
 ### Fixed

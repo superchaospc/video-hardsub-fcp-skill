@@ -95,6 +95,51 @@ class RationalTimelineTests(unittest.TestCase):
         self.assertNotIn("audioChannels", asset.attrib)
         self.assertNotIn("audioRate", asset.attrib)
 
+    def test_project_is_vertical_1080x1920_and_asset_keeps_media_format(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        source = Path(directory.name) / "cleaned.mp4"
+        source.write_bytes(b"media")
+        for width, height in ((1920, 1080), (720, 1280), (608, 1080)):
+            with self.subTest(media=f"{width}x{height}"):
+                info = make_info(width=width, height=height)
+                xml = MODULE.build_fcpxml(source, info, [75], "Vertical")
+                root = ET.fromstring(xml)
+                formats = {
+                    item.attrib["id"]: item for item in root.findall("./resources/format")
+                }
+                sequence = root.find("./library/event/project/sequence")
+                asset = root.find("./resources/asset")
+                project = formats[sequence.attrib["format"]]
+                media = formats[asset.attrib["format"]]
+                self.assertEqual((project.attrib["width"], project.attrib["height"]), ("1080", "1920"))
+                self.assertEqual((media.attrib["width"], media.attrib["height"]), (str(width), str(height)))
+                MODULE.verify_fcpxml(xml, source, info, [75])
+
+    def test_1080x1920_media_shares_the_project_format(self):
+        info = make_info(width=1080, height=1920)
+        xml = MODULE.build_fcpxml(Path("cleaned.mp4"), info, [75], "Vertical")
+        root = ET.fromstring(xml)
+        self.assertEqual(len(root.findall("./resources/format")), 1)
+        self.assertEqual(root.find("./resources/asset").attrib["format"], "r1")
+        self.assertEqual(
+            root.find("./library/event/project/sequence").attrib["format"], "r1"
+        )
+
+    def test_verifier_rejects_non_vertical_project_format(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "cleaned.mp4"
+            source.write_bytes(b"media")
+            base = MODULE.build_fcpxml(source, make_info(), [75], "Review")
+            mutations = (
+                base.replace('width="1080" height="1920"', 'width="1920" height="1080"', 1),
+                base.replace('<sequence format="r1"', '<sequence format="r3"', 1),
+            )
+            for xml in mutations:
+                self.assertNotEqual(xml, base)
+                with self.subTest(xml=xml[:200]), self.assertRaises(ValueError):
+                    MODULE.verify_fcpxml(xml, source, make_info(), [75])
+
     def test_30fps_timeline_is_contiguous_and_covers_every_frame(self):
         xml = MODULE.build_fcpxml(
             Path("cleaned.mp4"), make_info(), [75, 150, 221], "Reviewed cuts"

@@ -124,6 +124,8 @@ python3 "$SKILL_DIR/scripts/build-fcpxml.py" "$CLEANED_MEDIA" "$JOB_DIR/cut-plan
 
 Require every source frame exactly once, in order, with contiguous video and matching audio order. Produce one cleaned media file and one validated FCPXML timeline per source.
 
+The project (sequence) format is always vertical 1080x1920, whatever the media resolution; do not change it to match the media. The asset keeps a separate format with the media's real dimensions so Final Cut Pro fits the picture into the project instead of mislabelling its size. The fixed project format never replaces the resolution check above: a downscaled cleaned file still has to be reported, even though it fills the 1080x1920 timeline.
+
 Maintain the full operational per-file manifest described in the HitPaw reference and resume only unfinished entries. Do not pass that operational manifest to the packager. Convert completed entries to the separate minimal package manifest schema in the reference, excluding working state and service data. A batch archive is optional:
 
 ```bash
