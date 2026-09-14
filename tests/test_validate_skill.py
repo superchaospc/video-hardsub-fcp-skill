@@ -11,6 +11,7 @@ VALIDATOR = REPOSITORY_ROOT / "scripts" / "validate-skill.py"
 REQUIRED_SCRIPTS = (
     "analyze-cuts.py",
     "build-fcpxml.py",
+    "conform-vertical.sh",
     "fetch-hitpaw-result.sh",
     "inspect-video.sh",
     "install.sh",
@@ -33,7 +34,7 @@ description: Use when a user asks to remove hard subtitles and review jump cuts.
 
 Read [the HitPaw workflow](references/hitpaw-workflow.md).
 Run `scripts/analyze-cuts.py`, `scripts/build-fcpxml.py`,
-`scripts/fetch-hitpaw-result.sh`, `scripts/inspect-video.sh`,
+`scripts/conform-vertical.sh`, `scripts/fetch-hitpaw-result.sh`, `scripts/inspect-video.sh`,
 `scripts/install.sh`, `scripts/package-deliverables.sh`, and
 `scripts/verify-video.sh`.
 """,

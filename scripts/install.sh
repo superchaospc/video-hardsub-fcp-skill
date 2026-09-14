@@ -218,7 +218,7 @@ validate_source() {
   [ -f "$VALID_SOURCE_REAL/SKILL.md" ] || die '--source is not a valid video-hardsub-fcp Skill'
   first_name=$(awk '/^name:[[:space:]]*/ { sub(/^name:[[:space:]]*/, ""); print; exit }' "$VALID_SOURCE_REAL/SKILL.md")
   [ "$first_name" = "$SKILL_NAME" ] || die '--source is not a valid video-hardsub-fcp Skill'
-  for helper in inspect-video.sh fetch-hitpaw-result.sh verify-video.sh analyze-cuts.py build-fcpxml.py package-deliverables.sh; do
+  for helper in inspect-video.sh fetch-hitpaw-result.sh verify-video.sh conform-vertical.sh analyze-cuts.py build-fcpxml.py package-deliverables.sh; do
     [ -f "$VALID_SOURCE_REAL/scripts/$helper" ] || die "--source is missing scripts/$helper"
   done
 }

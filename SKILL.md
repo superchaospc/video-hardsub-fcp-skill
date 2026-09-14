@@ -20,6 +20,7 @@ Video workflow:
 - [ ] Confirm one batch manifest, regions, full-frame risk, and HitPaw credits
 - [ ] Submit each HitPaw job once; recover completed jobs from logs
 - [ ] Restore source geometry/audio and fully decode-verify
+- [ ] Conform the cleaned media to the 1080x1920 delivery format and verify it
 - [ ] Generate high-recall cut candidates and frame-pair review sheets
 - [ ] Classify every candidate: approve true discontinuities; reject persistent motion artifacts
 - [ ] Build and validate one FCPXML timeline per cleaned video
@@ -27,9 +28,11 @@ Video workflow:
 
 ## Resolution is a deliverable
 
-The output resolution must equal the source resolution. Record `width`x`height` from the first `ffprobe` of each source and treat it as a required output property, not something to read off the finished file. Upstream subtitle removal silently downscales — an export preset that says "1080" turns a 720x1080 source into 608x1080 — and a downscale is unrecoverable once it has happened.
+Two resolutions matter, and they are checked separately.
 
-Never satisfy this by upscaling a downscaled result back to source dimensions. That passes `source_display_geometry` while the detail is already gone. Fix it at the export, or report the loss.
+The restored media — the subtitle-free picture before delivery conforming — must equal the source resolution. Record `width`x`height` from the first `ffprobe` of each source and treat it as a required property, not something to read off the finished file. Upstream subtitle removal silently downscales — an export preset that says "1080" turns a 720x1280 source into 608x1080 — and a downscale is unrecoverable once it has happened. Never hide it by upscaling the restored media back to source dimensions; fix it at the export, or report the loss.
+
+The delivered media is always vertical 1080x1920, whatever the source resolution. `conform-vertical.sh` produces it as the last media step: it scales the picture to fit, centres it on black when the aspect is not 9:16, never crops or stretches, copies audio, and keeps every frame. This upscale is the requested delivery format, not a repair, so it happens only after the restored media has been verified against the source — otherwise a downscale would disappear inside it.
 
 ## Entry path: subtitles already removed
 
@@ -39,7 +42,7 @@ If the user supplies media whose subtitles were removed elsewhere ("去字幕已
 2. Run the verification below with that `$SOURCE`. `verify-video.sh` fails `source_identity` when `$SOURCE` and `$CLEANED_MEDIA` are byte-identical, because a file compared against itself proves nothing about geometry.
 3. If the pre-removal original genuinely cannot be produced, run verification without `--source` and state plainly in the report: resolution, frame rate, and duration could not be verified against the original, so any upstream change to them is unknown. Do not describe the delivery as matching the source.
 
-A resolution mismatch found here is reported, not repaired: tell the user the source and delivered dimensions, and that re-exporting from the subtitle-removal tool at source resolution is the only real fix.
+A resolution mismatch found here is reported, not repaired: tell the user the source and supplied dimensions, and that re-exporting from the subtitle-removal tool at source resolution is the only real fix. Then still conform and deliver 1080x1920 as below, and say in the report that it was upscaled from the smaller supplied file.
 
 ## Safety and inventory
 
@@ -100,14 +103,25 @@ trimmed_cleaned_fps=$(ffprobe -v error -select_streams v:0 -show_entries stream=
 "$SKILL_DIR/scripts/verify-video.sh" "$TRIMMED_CLEANED_MEDIA" "$JOB_DIR/verify-trimmed" --source "$TRIMMED_SOURCE_REFERENCE"
 ```
 
-After trimming, use `$TRIMMED_CLEANED_MEDIA` as the cleaned deliverable. Never remux full-length source audio onto trimmed video, and never verify a trimmed output against the full source. `verify-video.sh` checks display geometry, duration tolerance, full decodability, 1 fps sheet generation, whether audio is present when the comparison source has audio, and `source_identity` — that `$SOURCE` is not byte-identical to `$CLEANED_MEDIA`, which would make every source comparison vacuous. It does not prove audio identity or matching FPS; the remux and explicit FPS comparisons above are required. Visually compare the raw HitPaw result with the source wherever food, hands, tools, packaging, or UI may have been damaged. A script pass does not replace this review.
+After trimming, use `$TRIMMED_CLEANED_MEDIA` as `$CLEANED_MEDIA` for the conform step below. Never remux full-length source audio onto trimmed video, and never verify a trimmed output against the full source. `verify-video.sh` checks display geometry, duration tolerance, full decodability, 1 fps sheet generation, whether audio is present when the comparison source has audio, and `source_identity` — that `$SOURCE` is not byte-identical to `$CLEANED_MEDIA`, which would make every source comparison vacuous. It does not prove audio identity or matching FPS; the remux and explicit FPS comparisons above are required. Visually compare the raw HitPaw result with the source wherever food, hands, tools, packaging, or UI may have been damaged. A script pass does not replace this review.
+
+## Conform to 1080x1920
+
+Only after the verification above passes (or its failure has been reported), conform the cleaned media and verify the result. `--delivery-size` swaps the source geometry comparison for a check that the file is exactly 1080x1920; identity, audio, duration, and decode checks still run against the source:
+
+```bash
+"$SKILL_DIR/scripts/conform-vertical.sh" "$CLEANED_MEDIA" "$DELIVERY_MEDIA"
+"$SKILL_DIR/scripts/verify-video.sh" "$DELIVERY_MEDIA" "$JOB_DIR/verify-delivery" --source "$SOURCE" --delivery-size 1080x1920
+```
+
+Pass the trimmed source reference as `--source` when the media was trimmed. `$DELIVERY_MEDIA` keeps the extension of `$CLEANED_MEDIA`. It is the media used for cut analysis, FCPXML, and packaging, and `verify-delivery/report.json` is the verification that ships with it.
 
 ## Fine jump-cut decisions
 
 Generate high-recall candidates in fine mode. The analyzer combines scene scores, keyframes, and isolated YDIF peaks, then clusters nearby evidence into one candidate; its scores rank candidates but never approve cuts.
 
 ```bash
-python3 "$SKILL_DIR/scripts/analyze-cuts.py" "$CLEANED_MEDIA" --mode fine --output "$JOB_DIR/cut-plan.json" --review-dir "$JOB_DIR/cut-review"
+python3 "$SKILL_DIR/scripts/analyze-cuts.py" "$DELIVERY_MEDIA" --mode fine --output "$JOB_DIR/cut-plan.json" --review-dir "$JOB_DIR/cut-review"
 ```
 
 Review every candidate. Each sheet row holds one candidate as four consecutive frames (offsets -2, -1, 0, +1), so continuous motion carries across the row while a real cut breaks it; judge from the whole row, not from one adjacent pair. Rows are clamped and repeat an end frame when a candidate sits near the media boundary. Put every candidate exactly once in `selected_frames` or `rejected_candidates`. Approve only a visible temporal discontinuity. Reject continuous steam, ingredient motion, fast action, camera shake, or other persistent motion unless the row shows a true discontinuity. Allowed rejection reasons are `persistent-motion`, `steam`, `ingredient-motion`, `camera-shake`, and `no-visible-discontinuity`.
@@ -119,12 +133,12 @@ A candidate anchors a cluster of nearby evidence, so its frame can sit one frame
 Build FCPXML only after all candidate decisions are complete:
 
 ```bash
-python3 "$SKILL_DIR/scripts/build-fcpxml.py" "$CLEANED_MEDIA" "$JOB_DIR/cut-plan.json" --output "$JOB_DIR/project.fcpxml"
+python3 "$SKILL_DIR/scripts/build-fcpxml.py" "$DELIVERY_MEDIA" "$JOB_DIR/cut-plan.json" --output "$JOB_DIR/project.fcpxml"
 ```
 
-Require every source frame exactly once, in order, with contiguous video and matching audio order. Produce one cleaned media file and one validated FCPXML timeline per source.
+Require every source frame exactly once, in order, with contiguous video and matching audio order. Produce one 1080x1920 delivery media file and one validated FCPXML timeline per source.
 
-The project (sequence) format is always vertical 1080x1920, whatever the media resolution; do not change it to match the media. The asset keeps a separate format with the media's real dimensions so Final Cut Pro fits the picture into the project instead of mislabelling its size. The fixed project format never replaces the resolution check above: a downscaled cleaned file still has to be reported, even though it fills the 1080x1920 timeline.
+The project (sequence) format is always vertical 1080x1920; do not change it to match the media. The asset keeps a separate format with the media's real dimensions, so media that somehow is not 1080x1920 is still fitted rather than mislabelled. Neither the conformed media nor the fixed project format replaces the restored-media resolution check: a downscale found there is still reported, even though the delivery fills the 1080x1920 timeline.
 
 Maintain the full operational per-file manifest described in the HitPaw reference and resume only unfinished entries. Do not pass that operational manifest to the packager. Convert completed entries to the separate minimal package manifest schema in the reference, excluding working state and service data. A batch archive is optional:
 

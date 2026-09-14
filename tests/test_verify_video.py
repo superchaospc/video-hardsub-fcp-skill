@@ -27,9 +27,9 @@ def synth(path: Path, width: int, height: int) -> None:
 
 @unittest.skipUnless(have("ffmpeg") and have("ffprobe"), "ffmpeg/ffprobe required")
 class VerifyVideoSourceIdentity(unittest.TestCase):
-    def run_verify(self, cleaned: Path, source: Path, out: Path):
+    def run_verify(self, cleaned: Path, source: Path, out: Path, *extra: str):
         proc = subprocess.run(
-            [str(SCRIPT), str(cleaned), str(out), "--source", str(source)],
+            [str(SCRIPT), str(cleaned), str(out), "--source", str(source), *extra],
             capture_output=True, text=True)
         report = json.loads((out / "report.json").read_text()) if (out / "report.json").exists() else {}
         return proc, report
@@ -64,6 +64,28 @@ class VerifyVideoSourceIdentity(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0, "downscaled output must fail geometry")
             self.assertTrue(report["checks"]["source_identity"]["pass"])
             self.assertFalse(report["checks"]["source_display_geometry"]["pass"])
+
+    def test_delivery_size_replaces_source_geometry(self):
+        """A 1080x1920 delivery passes against a smaller source; its size is still checked."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.mp4"
+            synth(source, 720, 1280)
+            delivery = root / "delivery.mp4"
+            synth(delivery, 1080, 1920)
+            wrong = root / "wrong.mp4"
+            synth(wrong, 720, 1280)
+
+            proc, report = self.run_verify(
+                delivery, source, root / "ok", "--delivery-size", "1080x1920")
+            self.assertEqual(proc.returncode, 0, report)
+            self.assertTrue(report["checks"]["delivery_geometry"]["pass"])
+            self.assertNotIn("source_display_geometry", report["checks"])
+
+            proc, report = self.run_verify(
+                wrong, source, root / "bad", "--delivery-size", "1080x1920")
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertFalse(report["checks"]["delivery_geometry"]["pass"])
 
 
 if __name__ == "__main__":

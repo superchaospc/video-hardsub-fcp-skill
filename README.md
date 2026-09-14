@@ -70,7 +70,7 @@ bash scripts/install.sh --source "$PWD"
 
 每个源视频对应一组结果：
 
-- `cleaned.mp4` 或 `cleaned.mov`：去字幕并恢复源画面几何、源音频后的媒体。
+- `cleaned.mp4` 或 `cleaned.mov`：去字幕、保留源音频，并统一转成竖屏 1080×1920 的媒体（等比缩放，比例不是 9:16 时上下或左右补黑边，不裁切不拉伸，逐帧保留）。转换前会先按源分辨率核对，上游降分辨率仍会被报告。
 - `project.fcpxml`：可直接导入 Final Cut Pro 的连续切段时间线。
 - `cut-plan.json`：所有候选切点、批准项与拒绝原因。
 - `verify/report.json`：媒体验证摘要（ZIP 内重命名为 `verification.json`）。

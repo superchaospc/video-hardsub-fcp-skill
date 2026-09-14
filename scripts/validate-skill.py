@@ -20,6 +20,7 @@ REQUIRED_PATHS = (
     "references/hitpaw-workflow.md",
     "scripts/analyze-cuts.py",
     "scripts/build-fcpxml.py",
+    "scripts/conform-vertical.sh",
     "scripts/fetch-hitpaw-result.sh",
     "scripts/inspect-video.sh",
     "scripts/install.sh",

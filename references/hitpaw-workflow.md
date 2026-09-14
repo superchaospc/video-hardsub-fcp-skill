@@ -40,7 +40,8 @@ Read this sequence completely before submitting any HitPaw job. HitPaw is a paid
     ```
 
     Compare the trimmed files' `avg_frame_rate` separately as in step 11, document the approved interval, and use `$TRIMMED_CLEANED_MEDIA` as the deliverable. Never remux full-length source audio after trimming and never verify trimmed output against the full source.
-13. Compare the raw HitPaw result against the source anywhere full-frame repair may have damaged food, hands, tools, packaging, or UI. Do not promote damaged output merely because decoding succeeds.
+13. Conform the verified cleaned media to the 1080x1920 delivery format and verify that file: `"$SKILL_DIR/scripts/conform-vertical.sh" "$CLEANED_MEDIA" "$DELIVERY_MEDIA"`, then `"$SKILL_DIR/scripts/verify-video.sh" "$DELIVERY_MEDIA" "$JOB_DIR/verify-delivery" --source "$SOURCE" --delivery-size 1080x1920`. Conform only after steps 10–12, because the upscale would otherwise hide a downscale. `$DELIVERY_MEDIA` is the deliverable used for cuts, FCPXML, and packaging; its `verify-delivery/report.json` is the packaged verification.
+14. Compare the raw HitPaw result against the source anywhere full-frame repair may have damaged food, hands, tools, packaging, or UI. Do not promote damaged output merely because decoding succeeds.
 
 ## Operational batch manifest
 
