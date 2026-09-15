@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-09-15
+
+### Added
+
+- The HitPaw reference now covers a source that was already processed: hash it against earlier job folders, rescan the old cleaned media, and patch only the residual caption by submitting a short frame-accurate clip (credits scale with duration) and compositing it back by frame number.
+
+### Fixed
+
+- Documented that a Remove or 1080P-Confirm click which looked ineffective can land late; the log must be checked for a started task before clicking again, so a second paid job is never created.
+- Documented that `fetch-hitpaw-result.sh --wait` waits forever when the job finished before it started, and how to take Edimakor's already-downloaded local result instead.
+
 ## [1.5.0] - 2026-09-14
 
 ### Added
