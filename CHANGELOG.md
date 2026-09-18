@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-09-18
+
+### Changed
+
+- README describes exact-frame cut anchors, the splitting of long motion clusters, and HitPaw's one-box-per-job limit with its short-clip workaround.
+
 ## [1.6.0] - 2026-09-18
 
 ### Fixed
@@ -111,7 +117,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Decode, geometry, duration, audio-presence, XML, package-integrity, privacy, and repository validation.
 - Deterministic batch delivery archives with sanitized manifests and SHA-256 checksums.
 
-[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.4.0...v1.5.0
