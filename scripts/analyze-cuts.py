@@ -32,6 +32,8 @@ from typing import BinaryIO, Iterable, Iterator, Sequence
 
 
 SCENE_THRESHOLD = 0.012
+# Scene score at which a scene event alone marks a likely boundary.
+STRONG_SCENE_SCORE = 0.08
 REJECTION_REASONS = frozenset(
     {
         "persistent-motion",
@@ -129,17 +131,21 @@ def _cluster_anchor(cluster: Sequence[Evidence]) -> int:
     """Pick the frame with the strongest aligned, multi-kind support.
 
     ffmpeg filters may report the same physical boundary one frame apart.  A
-    one-frame alignment window counts those distinct kinds as combined support;
-    remaining ties prefer the weighted support, then the cluster's center.
+    one-frame alignment window counts those distinct kinds as combined support.
+    Ties then go to the frame carrying the strongest evidence itself: the window
+    around the frame after a cut also covers the cut, plus the weak scene scores
+    that follow it, so window support alone anchors real cuts one frame late.
+    Remaining ties prefer the window support, then the cluster's center.
     """
     frames = sorted({event.frame for event in cluster})
     center = statistics.median(event.frame for event in cluster)
 
-    def rank(frame: int) -> tuple[int, float, float, int]:
+    def rank(frame: int) -> tuple[int, float, float, float, int]:
         aligned = [event for event in cluster if abs(event.frame - frame) <= 1]
         kinds = len({event.kind for event in aligned})
+        own = sum(_evidence_weight(event) for event in aligned if event.frame == frame)
         support = sum(_evidence_weight(event) for event in aligned)
-        return kinds, support, -abs(frame - center), -frame
+        return kinds, own, support, -abs(frame - center), -frame
 
     return max(frames, key=rank)
 
@@ -164,11 +170,44 @@ def merge_evidence(
 
     candidates: list[Candidate] = []
     for cluster in clusters:
-        frame = _cluster_anchor(cluster)
-        reasons = sorted({event.kind for event in cluster})
-        confidence = sum(_evidence_weight(event) for event in cluster)
-        candidates.append(Candidate(frame, frame / fps, confidence, reasons))
+        for part in _split_cluster(cluster, cluster_frames):
+            frame = _cluster_anchor(part)
+            reasons = sorted({event.kind for event in part})
+            confidence = sum(_evidence_weight(event) for event in part)
+            candidates.append(Candidate(frame, frame / fps, confidence, reasons))
     return candidates
+
+
+def _is_strong(event: Evidence) -> bool:
+    return event.kind != "scene" or event.score >= STRONG_SCENE_SCORE
+
+
+def _split_cluster(
+    cluster: Sequence[Evidence], cluster_frames: int
+) -> list[list[Evidence]]:
+    """Split a chained cluster that holds more than one strong boundary.
+
+    Weak scene scores during continuous motion chain evidence far beyond
+    ``cluster_frames``, and one cluster yields one candidate, so a second real
+    cut in the chain would be lost.  Strong evidence farther than
+    ``cluster_frames`` from the anchor starts its own part; weak evidence stays
+    with the part it borders.
+    """
+    anchor = _cluster_anchor(cluster)
+    left = [event for event in cluster if event.frame < anchor - cluster_frames]
+    right = [event for event in cluster if event.frame > anchor + cluster_frames]
+    middle = [event for event in cluster if abs(event.frame - anchor) <= cluster_frames]
+    parts: list[list[Evidence]] = []
+    if any(_is_strong(event) for event in left):
+        parts.extend(_split_cluster(left, cluster_frames))
+    else:
+        middle = left + middle
+    if any(_is_strong(event) for event in right):
+        tail = _split_cluster(right, cluster_frames)
+    else:
+        middle = middle + right
+        tail = []
+    return parts + [middle] + tail
 
 
 def make_plan(
@@ -1390,7 +1429,9 @@ def _run_analysis(
             )
             candidates = filter_edge_candidates(candidates, info.frame_count)
             plan = make_plan(str(source), info.fps, info.frame_count, candidates)
-            plan["duration"] = info.duration
+            # The exact frame-grid duration build-fcpxml.py checks against;
+            # ffprobe's six-decimal string misses it for lengths like 1406/30.
+            plan["duration"] = info.frame_count / info.fps
 
             render_review(
                 source,
