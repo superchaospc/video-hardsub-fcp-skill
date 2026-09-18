@@ -105,6 +105,8 @@ FCPXML 中的切段是同一清理媒体上的可编辑边界，不会把视频�
 
 分析器组合场景分数、关键帧和孤立的逐帧差异峰值，因此能比单一场景阈值找到更多同机位微跳剪。分数只用于排序，不会自动批准切点。代理必须查看每个候选点，并把它明确归入批准或拒绝；蒸汽、落料、快速动作和抖动等连续运动通常应拒绝。高召回意味着候选可能偏多，但能减少漏掉细小跳剪的概率。
 
+每个候选点落在证据最强的那一帧上，也就是新镜头的第一帧，这样 FCPXML 的切口不会混进上一镜头的一帧。翻炒、倒酱这类连续动作会产生大量弱场景分，把几十帧串成一组；分析器会在组内找出彼此相隔较远的强信号（关键帧、差异峰值或较高的场景分），各自拆成独立候选，避免同一段连续动作里的第二个真跳剪被吞掉。
+
 复核图每个候选占一行四帧（候选帧的 -2、-1、0、+1）。只看候选帧和它的前一帧不足以判断：翻炒、蒸汽和手部动作的相邻帧差异同样很大，跟真跳剪难以区分。四帧连排后，运动要么在整行里连续延续，要么在切点处断开，判断依据直接可见。候选靠近首尾时窗口会夹取到边界并重复端帧，以保持每行列数固定。
 
 复核图分页会按源片宽高比调整：竖屏每页 3 个候选，横屏 5 个。固定的 4×5 网格是按 16:9 设计的，用在 9:16 素材上会生成 1290×2862 的长图，缩放到阅读尺寸后每帧过小，细节不可辨。
@@ -121,6 +123,7 @@ FCPXML 中的切段是同一清理媒体上的可编辑边界，不会把视频�
 
 - 交付尺寸固定为 1080×1920。横屏或非 9:16 素材会带黑边，不会自动裁切铺满；原片低于 1080×1920 时，转换只是放大，不增加细节。
 - 只支持 macOS 上的 MP4/MOV 工作流；桌面自动化取决于当前宿主的可用能力和 HitPaw 界面状态。
+- HitPaw 每个任务只能框一个区域，导入片段至少 2 秒。字幕分在两处且相距较远时（例如全片底部字幕加开头几帧标题），要把第二处截成单独片段另外提交，再按帧号合成回去。
 - 去字幕质量取决于 HitPaw 的生成式修复。复杂背景、移动字幕或全画面模式必须人工目检。
 - 跳剪检测以减少漏检为目标，但视觉复核仍是必需步骤；它不能保证理解所有创作意图。
 - 候选帧锚定的是一簇邻近证据。当这簇证据不含关键帧时，锚点帧可能落在可见切点之后一帧（误差 1/30 秒左右）。`build-fcpxml.py` 要求批准项必须取自候选列表，因此该偏差会保留到成片，可在 Final Cut Pro 中微调。
@@ -144,4 +147,4 @@ python3 scripts/validate-skill.py .
 
 ## English summary
 
-Video Hardsub → FCP is a macOS Agent Skill shared by Codex and Claude Code. Give an agent one or more hard-subtitled MP4/MOV files and say `去字幕切段`; it coordinates explicit paid-job approval, safe HitPaw result recovery, high-recall jump-cut review, media verification, and an editable Final Cut Pro FCPXML timeline. Every delivery is vertical 1080x1920: the cleaned media is fit-scaled onto that frame (black padding when the aspect is not 9:16, never cropped or stretched, every frame kept) and the FCPXML project uses a 1080x1920 format. The restored media is verified against the source resolution before that conform, so an upstream downscale is still reported rather than hidden by the upscale. Review sheets show each candidate as four consecutive frames so continuous motion can be told apart from a real cut, and pages adapt to the source aspect ratio. HitPaw Edimakor and Final Cut Pro are proprietary user-installed prerequisites and are not bundled.
+Video Hardsub → FCP is a macOS Agent Skill shared by Codex and Claude Code. Give an agent one or more hard-subtitled MP4/MOV files and say `去字幕切段`; it coordinates explicit paid-job approval, safe HitPaw result recovery, high-recall jump-cut review, media verification, and an editable Final Cut Pro FCPXML timeline. Every delivery is vertical 1080x1920: the cleaned media is fit-scaled onto that frame (black padding when the aspect is not 9:16, never cropped or stretched, every frame kept) and the FCPXML project uses a 1080x1920 format. The restored media is verified against the source resolution before that conform, so an upstream downscale is still reported rather than hidden by the upscale. Each candidate lands on the first frame of the new shot, and a long stretch of continuous motion is split wherever it holds more than one strong boundary, so a second jump cut inside it is not lost. Review sheets show each candidate as four consecutive frames so continuous motion can be told apart from a real cut, and pages adapt to the source aspect ratio. HitPaw takes one selection box per job (clips of at least 2 s), so a second, distant caption region is handled as a separate short-clip job. HitPaw Edimakor and Final Cut Pro are proprietary user-installed prerequisites and are not bundled.
