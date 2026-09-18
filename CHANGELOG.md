@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-18
+
+### Fixed
+
+- `analyze-cuts.py` anchored real cuts one frame late. A frame's ±1 window also covers the cut before it, plus the weak scene scores that follow, so the frame after the cut often won. Ties on evidence kinds now go to the frame carrying the strongest evidence itself. On a 35 s cooking video, 6 of 16 cuts had been anchored one frame late; all 16 now land on the exact frame.
+- `analyze-cuts.py` could drop a real cut. Weak scene scores during continuous motion chain evidence into one long cluster, and one cluster yields one candidate, so a second strong boundary in the chain disappeared. A cluster is now split wherever strong evidence (a keyframe, a YDIF peak, or a scene score of at least 0.08) sits more than the cluster window from the anchor. The same video had 5 real jump cuts that never became candidates.
+- `analyze-cuts.py` now writes the plan duration as `frame_count / fps`, the exact frame-grid value `build-fcpxml.py` checks. ffprobe's six-decimal duration failed that check for lengths such as 1406 frames at 30 fps.
+
+### Added
+
+- The HitPaw reference documents the one-box-per-job limit, the two-job workaround for a second region, the 2-second minimum clip length, and maximizing the window before drawing a box.
+
 ## [1.5.1] - 2026-09-15
 
 ### Added
@@ -99,7 +111,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Decode, geometry, duration, audio-presence, XML, package-integrity, privacy, and repository validation.
 - Deterministic batch delivery archives with sanitized manifests and SHA-256 checksums.
 
-[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.5.1...v1.6.0
+[1.5.1]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/superchaospc/video-hardsub-fcp-skill/compare/v1.2.0...v1.3.0

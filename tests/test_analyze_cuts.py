@@ -43,6 +43,33 @@ class AnalyzeCutsTests(unittest.TestCase):
         self.assertEqual(candidates[0].reasons, ["keyframe", "scene", "ydif"])
         self.assertAlmostEqual(candidates[0].confidence, 2.0 + 3.0 + 19.0 / 12.0)
 
+    def test_anchor_stays_on_cut_frame_despite_trailing_scene_noise(self):
+        # Real evidence from a hard cut at frame 159: every strong signal sits on
+        # 159, while weak scene scores follow it.  The window around 160 also
+        # covers 159, so window support alone used to anchor the cut at 160.
+        events = [
+            MODULE.Evidence(159, "keyframe", 1.0),
+            MODULE.Evidence(159, "scene", 0.39),
+            MODULE.Evidence(159, "ydif", 40.77),
+            MODULE.Evidence(160, "scene", 0.02),
+            MODULE.Evidence(161, "scene", 0.03),
+        ]
+        candidates = MODULE.merge_evidence(events, cluster_frames=3)
+        self.assertEqual([item.frame for item in candidates], [159])
+
+    def test_weak_scene_chain_does_not_swallow_a_second_cut(self):
+        # Weak scene scores every two frames chain 525..584 into one cluster;
+        # both strong boundaries must still become candidates.
+        events = [MODULE.Evidence(frame, "scene", 0.02) for frame in range(527, 583, 2)]
+        events += [
+            MODULE.Evidence(525, "scene", 0.115),
+            MODULE.Evidence(525, "ydif", 12.5),
+            MODULE.Evidence(584, "keyframe", 1.0),
+            MODULE.Evidence(584, "scene", 0.086),
+        ]
+        candidates = MODULE.merge_evidence(events, cluster_frames=3)
+        self.assertEqual([item.frame for item in candidates], [525, 584])
+
     def test_empty_evidence_produces_no_candidates(self):
         self.assertEqual(MODULE.merge_evidence([], cluster_frames=3), [])
 
