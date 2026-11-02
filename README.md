@@ -29,7 +29,7 @@
 - 已安装 HitPaw Edimakor，且当前代理宿主具备桌面控制能力，才能自动执行去字幕界面操作。
 - 如需继续剪辑，已安装 Final Cut Pro。
 
-HitPaw Edimakor 和 Final Cut Pro 都是需要用户自行安装、授权或购买的专有软件，本仓库不包含它们，也不会静默购买或消耗 HitPaw 点数。提交任何付费任务前，Skill 会要求一次明确确认。
+HitPaw Edimakor 和 Final Cut Pro 都是需要用户自行安装、授权或购买的专有软件，本仓库不包含它们。核对文件、选区、界面实际费用及余额后，单次超过100积分必须先报给用户并等待明确批准，低于100可按已有授权自动提交；恰好100若遇到先确认。不拆单绕过审批，不自行充值或购买。
 
 ## 安装
 
@@ -55,7 +55,7 @@ bash scripts/install.sh --source "$PWD"
 去字幕切段
 ```
 
-代理会检查视频、展示字幕区域和全画面修复风险，并在使用 HitPaw 点数前请求确认。完成后，它会复核所有切点，生成清理后的媒体和 FCPXML。双击 `.fcpxml` 文件，或在 Final Cut Pro 中选择“文件 → 导入 → XML”，即可继续编辑。
+代理会检查视频、记录字幕区域和全画面修复风险，核对 HitPaw 费用及余额，单次超过100积分先等待用户批准，低于100可自动提交。完成后，它会复核所有切点，生成清理后的媒体和 FCPXML。双击 `.fcpxml` 文件，或在 Final Cut Pro 中选择“文件 → 导入 → XML”，即可继续编辑。
 
 ## 批量使用
 
@@ -65,7 +65,7 @@ bash scripts/install.sh --source "$PWD"
 这些视频全部去字幕切段，逐个处理，完成后打包。
 ```
 
-批量流程会先列出准确文件清单、每个文件的字幕区域、全画面修复风险和预计提交次数，再请求一次总确认。每个条目保存独立状态；中断后只恢复未完成条目，不会把多个来源合并，也不会因等待或下载失败而重复提交付费任务。
+批量流程会先列出准确文件清单、每个文件的字幕区域、全画面修复风险和预计提交次数，按每次实际费用应用审批规则：超过100积分先获用户明确批准，低于100可自动；不拆单规避确认。每个条目保存独立状态；中断后只恢复未完成条目，不会把多个来源合并，也不会因等待或下载失败而重复提交付费任务。
 
 ## 输出与完整性
 
@@ -123,7 +123,7 @@ FCPXML 中的切段是同一清理媒体上的可编辑边界，不会把视频�
 
 - 交付尺寸固定为 1080×1920。横屏或非 9:16 素材会带黑边，不会自动裁切铺满；原片低于 1080×1920 时，转换只是放大，不增加细节。
 - 只支持 macOS 上的 MP4/MOV 工作流；桌面自动化取决于当前宿主的可用能力和 HitPaw 界面状态。
-- HitPaw 每个任务只能框一个区域，导入片段至少 2 秒。字幕分在两处且相距较远时（例如全片底部字幕加开头几帧标题），要把第二处截成单独片段另外提交，再按帧号合成回去。
+- HitPaw 每个任务只能框一个区域，导入片段至少 2 秒。对需要去除的持续字幕可按位置分别处理；开头几帧等短暂特殊字幕可保留并记录时间，不为它额外扩大范围或提交任务。
 - 去字幕质量取决于 HitPaw 的生成式修复。复杂背景、移动字幕或全画面模式必须人工目检。
 - 跳剪检测以减少漏检为目标，但视觉复核仍是必需步骤；它不能保证理解所有创作意图。
 - 候选帧锚定的是一簇邻近证据。当这簇证据不含关键帧时，锚点帧可能落在可见切点之后一帧（误差 1/30 秒左右）。`build-fcpxml.py` 要求批准项必须取自候选列表，因此该偏差会保留到成片，可在 Final Cut Pro 中微调。
@@ -147,4 +147,8 @@ python3 scripts/validate-skill.py .
 
 ## English summary
 
-Video Hardsub → FCP is a macOS Agent Skill shared by Codex and Claude Code. Give an agent one or more hard-subtitled MP4/MOV files and say `去字幕切段`; it coordinates explicit paid-job approval, safe HitPaw result recovery, high-recall jump-cut review, media verification, and an editable Final Cut Pro FCPXML timeline. Every delivery is vertical 1080x1920: the cleaned media is fit-scaled onto that frame (black padding when the aspect is not 9:16, never cropped or stretched, every frame kept) and the FCPXML project uses a 1080x1920 format. The restored media is verified against the source resolution before that conform, so an upstream downscale is still reported rather than hidden by the upscale. Each candidate lands on the first frame of the new shot, and a long stretch of continuous motion is split wherever it holds more than one strong boundary, so a second jump cut inside it is not lost. Review sheets show each candidate as four consecutive frames so continuous motion can be told apart from a real cut, and pages adapt to the source aspect ratio. HitPaw takes one selection box per job (clips of at least 2 s), so a second, distant caption region is handled as a separate short-clip job. HitPaw Edimakor and Final Cut Pro are proprietary user-installed prerequisites and are not bundled.
+Video Hardsub → FCP is a macOS Agent Skill shared by Codex and Claude Code. Give an agent one or more hard-subtitled MP4/MOV files and say `去字幕切段`; it requires explicit approval for each charge above 100 HitPaw credits, permits authorized charges below 100, and coordinates safe result recovery, high-recall jump-cut review, media verification, and an editable Final Cut Pro FCPXML timeline. Every delivery is vertical 1080x1920: the cleaned media is fit-scaled onto that frame (black padding when the aspect is not 9:16, never cropped or stretched, every frame kept) and the FCPXML project uses a 1080x1920 format. The restored media is verified against the source resolution before that conform, so an upstream downscale is still reported rather than hidden by the upscale. Each candidate lands on the first frame of the new shot, and a long stretch of continuous motion is split wherever it holds more than one strong boundary, so a second jump cut inside it is not lost. Review sheets show each candidate as four consecutive frames so continuous motion can be told apart from a real cut, and pages adapt to the source aspect ratio. HitPaw takes one selection box per job (clips of at least 2 s), so sustained distant caption regions may need separate jobs; brief unusual-position captions may be retained and documented for the user to crop later. HitPaw Edimakor and Final Cut Pro are proprietary user-installed prerequisites and are not bundled.
+
+## 字幕范围与画质
+
+文字和底条一起去除优先 **Watermark Remover**；短暂特殊位置字幕可保留并标时间，不擅自删帧。用户只要求底部字幕时，只处理底部，不扩展到其他工具或修复试验。验收需要检查修复区域的运动画质，不能只看无字扫描或区域外PSNR。

@@ -5,7 +5,25 @@ description: Removes burned-in subtitles, detects fine same-camera jump cuts, an
 
 # Video Hardsub → FCP
 
-Treat “去字幕切段” as sufficient to start this workflow. Do not ask the user to restate the goal. Pause only at the single paid-submission confirmation or when a required capability/input is unavailable.
+## Subtitle quality and brief exceptions (user preference, 2026-11-02)
+
+- **Prioritize Watermark Remover for subtitles with a backing bar**: select the complete text, shadow and bar together. Do not default to Text Remover followed by filling the leftover bar. Text Remover is an alternative only when a representative sample demonstrates complete, natural removal; do not automatically switch to Object Remover.
+- For a subtitle in an unusual position that appears for only a few frames or a very short interval, leave it intact when repair would damage the picture or enlarge the repair region. The user will crop or cut that portion later. Record its exact start/end times or frame numbers in the manifest/report as intentionally retained; do not invent a fixed duration threshold.
+- Prioritize sustained main captions. Inspect the entire frame, but exclude the documented brief exceptions from the removal-region union. Do not expand a whole-video mask or submit another job solely to remove a brief outlier.
+- Keep the full video, frames and audio. The user's statement that they will crop later does **not** authorize the agent to crop, trim, delete frames or cut the timeline. Deliver 1080×1920 as usual; only perform cuts when separately requested.
+- Validate difficult short samples before processing the full video. Inspect the repaired region in motion for smearing, stretched textures, repeated patterns and damaged hands/food/utensils. No-text scans and outside-mask PSNR do not establish repair quality. List intentional residuals separately from failures and never describe a result containing them as completely text-free.
+
+## Respect the requested scope
+
+When the user asks only for bottom subtitles with Watermark Remover, process only the bottom text and its backing bar using that tool. Preserve other titles/text, full duration, audio and delivery geometry. Do not expand into Object Remover, photo repair, temporal reconstruction, extra samples or other cleanup unless the user requests it. Scope-specific user instructions override the general quality workflow below.
+
+## Standing authorization for this user
+
+The user's latest instruction on 2026-11-02 is: “如果积分消耗一次超过100，先报警给我，让我点通过，不到100的没关系”. This supersedes the earlier blanket automatic-submission authorization and the earlier quality-rework instruction not to worry about credits.
+
+Before each credit-consuming submission, prepare the exact file, selected region, current displayed cost and sufficient balance. **If one submission costs more than 100 credits, show that concrete job and its cost to the user and wait for explicit approval before clicking Submit/Remove.** A progress update, silence, elapsed time or an earlier blanket authorization is not approval. For a submission below 100 credits, use the existing standing authorization after these checks. The user did not specify the exactly-100 boundary; if it arises, obtain approval rather than inventing authorization for that case. Do not split an otherwise single job into smaller charges to bypass approval. Record the displayed cost, threshold decision and any explicit approval in the manifest. Never purchase or top up credits. Submit each approved entry once; recover a stalled job rather than paying for a duplicate. Apply the same rule on MacBook and Mini, in Codex and Claude Code.
+
+Treat “去字幕切段” as sufficient to start this workflow. Do not ask the user to restate the goal. Apply the per-submission credit rule above: prepare jobs autonomously, but obtain explicit approval before a charge over 100 credits. Also stop for insufficient balance or genuinely missing input/capability.
 
 Set `SKILL_DIR` to the directory containing this `SKILL.md`; invoke every helper by its skill-relative path under `"$SKILL_DIR/scripts"`.
 
@@ -17,7 +35,7 @@ Video workflow:
 - [ ] Inventory sources; preserve originals
 - [ ] Record each source's `width`x`height`; carry it as the required output resolution
 - [ ] Inspect contact sheets; choose per-file subtitle regions
-- [ ] Confirm one batch manifest, regions, full-frame risk, and HitPaw credits
+- [ ] Record one batch manifest, regions, full-frame risk, HitPaw cost/balance and standing authorization
 - [ ] Submit each HitPaw job once; recover completed jobs from logs
 - [ ] Restore source geometry/audio and fully decode-verify
 - [ ] Conform the cleaned media to the 1080x1920 delivery format and verify it
@@ -55,15 +73,15 @@ A resolution mismatch found here is reported, not repaired: tell the user the so
 ```
 
 - Inspect both contact sheets for every file. Group files only when their visible layouts support the same region; store the decision per file.
-- Measure caption position by scanning every row of the frame, from 0 to the full height, not by reading it off a contact sheet. Sheets are scaled down far enough to hide a low-contrast cue, and the cue that sits away from the others is the one they hide. Take the union of every row band the scan reports across the whole clip, then pad it. Padding costs nothing because pixels outside the region come from the source; missing one cue costs a second paid job.
-- Use a tight band for a fixed caption. A moving caption requires full-frame removal and an explicit warning that hands, food, tools, packaging, or UI may be damaged. Preserve the raw HitPaw output separately.
-- After removal, run the same full-height scan on the result. An empty result on every frame is what proves the region covered every cue; a handful of thumbnails does not.
+- Measure caption position by scanning every row of the frame, from 0 to the full height, not by reading it off a contact sheet. Sheets are scaled down far enough to hide a low-contrast cue, and the cue that sits away from the others is the one they hide. Classify brief unusual-position cues as intentional exceptions when appropriate. Union only captions selected for removal, with a modest margin around text, shadow and backing. Enlarging a repair region can damage image content.
+- Use a tight band for a fixed caption. For moving sustained captions, prefer shot-specific regions; use full-frame repair only if necessary and validated on difficult samples, noting that hands, food, tools, packaging or UI may be damaged. Preserve the raw HitPaw output separately.
+- After removal, run the same full-height scan on the result. Review every surviving cue: documented brief intentional exceptions are allowed, while unintended residuals require correction. A handful of thumbnails does not establish coverage or visual quality.
 
 ## HitPaw submission boundary
 
 Before any HitPaw submission, read [references/hitpaw-workflow.md](references/hitpaw-workflow.md) completely.
 
-Create one batch manifest and request one explicit confirmation covering the exact files, each region, every full-frame quality risk, and the paid HitPaw credits. Never silently buy or consume credits.
+Create one batch manifest recording the exact files, each region, every full-frame quality risk, displayed HitPaw cost and sufficient balance. Apply the per-submission credit rule above; a charge over 100 credits requires explicit approval before submission. Report material quality risks in progress updates; never purchase or top up credits.
 
 Check for the current host's desktop-control capability before interacting with HitPaw. If it is unavailable, stop with this precise handoff: the manifest and working copies are ready, but HitPaw submission must be performed in a host with desktop control; no job was submitted and no success is claimed.
 

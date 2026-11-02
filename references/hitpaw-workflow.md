@@ -1,16 +1,18 @@
 # HitPaw workflow
 
+> Credit gate: follow the latest per-submission rule in SKILL.md. A charge over 100 credits requires explicit user approval before submitting; prepare the exact file/region/cost first. Do not split a job to bypass this gate.
+
 Read this sequence completely before submitting any HitPaw job. HitPaw is a paid GUI prerequisite; use only the current host's desktop-control capability. If that capability is absent, prepare the manifest and working copies, then hand off without claiming submission or success.
 
 ## Safe sequence
 
 1. Create a dedicated ASCII-only work root. Copy each MP4/MOV into its own folder; never edit or upload the source in place.
 2. Run `"$SKILL_DIR/scripts/inspect-video.sh" "$WORKING_COPY" "$JOB_DIR/inspect"` and inspect the metadata plus full-frame and subtitle-band contact sheets.
-3. Select a per-file region from a full-height row scan, never from the contact sheets: at thumbnail scale a low-contrast cue is invisible, and an outlying cue is exactly the one that hides. Union every row band the scan reports across the clip, then pad it. Use a tight band for fixed captions. Use full frame for moving captions only after warning that generative repair can damage food, hands, tools, packaging, or UI.
+3. Select a per-file region from a full-height row scan, never from the contact sheets: at thumbnail scale a low-contrast cue is invisible, and an outlying cue is exactly the one that hides. Classify brief unusual-position cues as intentional exceptions per SKILL.md, record their time/frame ranges, then union only captions selected for removal with a modest margin for text, shadow and backing. Prioritize Watermark Remover for text with a backing bar. Use a tight band for fixed captions. Use full frame for moving captions only after warning that generative repair can damage food, hands, tools, packaging, or UI.
 4. Set HitPaw's export resolution to the source's exact `width`x`height` before submitting, and record it as `export_resolution` in the manifest entry. HitPaw's presets are named by one dimension ("1080"), so a 720x1280 source silently exports as 608x1080 unless the resolution is set explicitly. Verify the setting in the export dialog rather than assuming the default preserves it — this is the only step that actually preserves resolution; every later check can only detect the loss.
-   HitPaw takes exactly one box per job, in both Remove watermark and Remove text modes; dragging on empty canvas or right-clicking adds nothing. When the scan finds two separate regions, such as a caption band on every frame plus a title on the first few frames, submit the full video with the band selected, then submit a short clip covering only the other region's frames, and composite each result only inside its own mask and frame range. HitPaw refuses clips shorter than 2 seconds, so cut at least 2.5 s (about 3 credits). Double-click the title bar to maximize the window before drawing a box: on a small window one screen point spans about eight source pixels.
+   HitPaw takes exactly one box per job, in both Remove watermark and Remove text modes; dragging on empty canvas or right-clicking adds nothing. When the scan finds a sustained caption band plus a title on only the first few frames, leave the brief title intact and record it for the user to crop later. Do not create a separate repair job just for that outlier. Separate jobs and frame-specific masks remain appropriate for multiple sustained regions requiring removal. HitPaw refuses clips shorter than 2 seconds, so cut at least 2.5 s (about 3 credits). Double-click the title bar to maximize the window before drawing a box: on a small window one screen point spans about eight source pixels.
 5. Confirm desktop-control capability. Without it, stop before submission and state that no job was submitted.
-6. Read the AI-credit balance in HitPaw's header first and check the batch against it, so the confirmation you ask for is one you can actually honour. The Remove button prints the per-job price beside the balance. If the balance will not cover every entry, say which entries it covers and stop there. Then prepare one batch manifest and obtain one confirmation for the exact files, regions, full-frame risks, and total paid-credit use. Never silently purchase or consume credits, and never purchase them at all.
+6. Read the AI-credit balance in HitPaw's header and the per-job price on Remove; check the whole batch against the balance. If the balance will not cover every entry, report the shortfall and do not purchase. Record exact files, regions, full-frame risks and total cost in one manifest. Apply the per-submission approval rule in SKILL.md: show the exact job and obtain explicit approval for any charge over 100 credits; below 100 may proceed under the standing authorization. Never purchase or top up credits.
 7. If HitPaw rejects the working media, create a compatibility MP4 inside the job folder while retaining the working copy:
 
    ```bash
@@ -48,7 +50,7 @@ Read this sequence completely before submitting any HitPaw job. HitPaw is a paid
 
 Before planning a paid job, hash each source and compare it against earlier job folders. A byte-identical source that already has a cleaned result, cut plan, and report is not a new job: read its report for known residual captions, run the full-height row scan on the old cleaned media, and patch only what remains.
 
-To patch a residual caption, submit a frame-accurate clip covering just the affected frames plus a margin (credits scale with duration: a 3.4 s clip cost 4 credits where the full 36 s video cost 37). Region-select only the residual band. Composite the result onto the old cleaned media inside a feathered band mask and only between the clip's start and end frames, after the offset-PSNR alignment check. Then rescan every frame, confirm the PSNR against the old cleaned media outside the patch reflects only re-encoding, re-run `analyze-cuts.py` on the new delivery, reuse the earlier decisions for unchanged candidate frames, and review every new candidate.
+First classify whether a residual is an allowed brief unusual-position exception; if so, retain and report it without another paid job. For a residual that genuinely requires repair, submit a frame-accurate clip covering just the affected frames plus a margin (credits scale with duration: a 3.4 s clip cost 4 credits where the full 36 s video cost 37). Region-select only the residual band. Composite the result onto the old cleaned media inside a feathered band mask and only between the clip's start and end frames, after the offset-PSNR alignment check. Then rescan every frame, confirm the PSNR against the old cleaned media outside the patch reflects only re-encoding, re-run `analyze-cuts.py` on the new delivery, reuse the earlier decisions for unchanged candidate frames, and review every new candidate.
 
 ## Operational batch manifest
 
@@ -60,7 +62,7 @@ Store one record per file with these fields:
 - `subtitle_region`
 - `export_resolution`
 - `full_frame_warning`
-- `approval`
+- `approval` (record the displayed cost, threshold decision, and explicit user approval for a charge over 100 credits; below 100 may use standing authorization)
 - `submission_status`
 - `result_path`
 - `verification_status`
